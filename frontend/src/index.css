@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: 'Bricolage Grotesque', system-ui, sans-serif;
+
+  --color-bg: #09090b;
+  --color-surface: #18181b;
+  --color-elevated: #27272a;
+  --color-border: #3f3f46;
+  --color-border-subtle: #27272a;
+
+  --color-text: #fafafa;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+
+  --color-accent: #4ade80;
+  --color-accent-dim: #166534;
+  --color-warn: #fb923c;
+  --color-warn-dim: #7c2d12;
+  --color-info: #38bdf8;
+}
+
+/* ── Base ─────────────────────────────── */
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Subtle noise texture ─────────────── */
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Scrollbar ────────────────────────── */
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
+
+/* ── Keyframes ────────────────────────── */
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-right {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes bar-fill {
+  from { width: 0; }
+}
+
+@keyframes number-pop {
+  0% { opacity: 0; transform: scale(0.3); }
+  60% { transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes step-rocket {
+  from { opacity: 0; transform: translateX(-16px) scale(0.95); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes step-agent {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes thinking {
+  0%, 80%, 100% { opacity: 0.15; }
+  40% { opacity: 0.8; }
+}
+
+.animate-fade-up { animation: fade-up 0.5s ease-out both; }
+.animate-fade-in { animation: fade-in 0.4s ease-out both; }
+.animate-scale-in { animation: scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slide-right { animation: slide-right 0.15s ease-out both; }
+.animate-number-pop { animation: number-pop 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-step-rocket { animation: step-rocket 0.12s ease-out both; }
+.animate-step-agent { animation: step-agent 0.4s ease-out both; }
+
+.thinking-dot { animation: thinking 1.4s ease-in-out infinite; }
+.thinking-dot-2 { animation-delay: 0.2s; }
+.thinking-dot-3 { animation-delay: 0.4s; }
+
+/* ── Utility ──────────────────────────── */
+
+.gradient-text {
+  background: linear-gradient(135deg, #4ade80 0%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glass {
+  background: rgba(24, 24, 27, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glow-green {
+  box-shadow: 0 0 40px rgba(74, 222, 128, 0.08), 0 0 80px rgba(74, 222, 128, 0.04);
+}
+
+.glow-green-strong {
+  box-shadow: 0 0 60px rgba(74, 222, 128, 0.15), 0 0 120px rgba(74, 222, 128, 0.06);
+}
