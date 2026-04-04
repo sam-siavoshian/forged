@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ChevronRightIcon, RocketIcon, SearchIcon, SparklesIcon } from 'lucide-animated';
 import { TaskInput } from './components/TaskInput';
 import { BrowserEmbed } from './components/BrowserEmbed';
 import { Timer } from './components/Timer';
@@ -7,14 +8,13 @@ import { PhaseIndicator } from './components/PhaseIndicator';
 import { ComparisonCard } from './components/ComparisonCard';
 import { TemplateSearchCard } from './components/TemplateSearchCard';
 import { Analogy } from './components/Analogy';
-import { TemplateVisualizer } from './components/TemplateVisualizer';
 import { LearningHistory } from './components/LearningHistory';
 import { usePoller } from './hooks/usePoller';
 import { useTimer } from './hooks/useTimer';
 import { startCompare, startLearn, getTemplates } from './api';
 import type { Template, Phase } from './types';
 
-type View = 'idle' | 'searching' | 'learning' | 'racing' | 'results';
+type View = 'idle' | 'learning' | 'racing' | 'results';
 
 function App() {
   const [view, setView] = useState<View>('idle');
@@ -50,19 +50,22 @@ function App() {
     }
   }, [baseStatus?.status, rocketStatus?.status]);
 
-  const launch = useCallback(async (task: string) => {
+  // When Race is clicked, show the search card inline (don't change view)
+  const [searchingTask, setSearchingTask] = useState<string | null>(null);
+
+  const launch = useCallback((task: string) => {
     setCurrentTask(task);
+    setSearchingTask(task);  // shows search card below input
+  }, []);
+
+  // Actually start the race (called from search card)
+  const startRace = useCallback(async () => {
+    const task = searchingTask || currentTask;
+    setSearchingTask(null);
     setBaselineId(null);
     setRocketId(null);
     baseTimer.reset();
     rocketTimer.reset();
-    // Show search card first — don't jump straight to racing
-    setView('searching');
-  }, [baseTimer, rocketTimer]);
-
-  // Actually start the race (called from search card or directly)
-  const startRace = useCallback(async () => {
-    const task = currentTask;
     setView('racing');
     try {
       const { baseline_session_id, rocket_session_id } = await startCompare(task);
@@ -71,10 +74,11 @@ function App() {
       baseTimer.start();
       rocketTimer.start();
     } catch { setView('idle'); }
-  }, [currentTask, baseTimer, rocketTimer]);
+  }, [searchingTask, currentTask, baseTimer, rocketTimer]);
 
   const learn = useCallback(async (task: string) => {
     setCurrentTask(task);
+    setSearchingTask(null);
     setLearnId(null);
     learnTimer.reset();
     setView('learning');
@@ -86,6 +90,7 @@ function App() {
   }, [learnTimer]);
 
   const reset = useCallback(() => {
+    setSearchingTask(null);
     setBaselineId(null);
     setRocketId(null);
     setLearnId(null);
@@ -112,86 +117,76 @@ function App() {
 
       {/* ━━━ IDLE ━━━ */}
       {view === 'idle' && (
-        <div className="flex-1 flex flex-col relative z-10 overflow-y-auto">
-          <header className="flex items-center justify-between px-8 h-12 border-b border-border-subtle flex-shrink-0 sticky top-0 z-20" style={{ background: '#0a0a0a' }}>
+        <div className="flex-1 flex flex-col relative z-10">
+          {/* Header with inline flow */}
+          <header className="flex items-center justify-between px-8 h-12 border-b border-border-subtle flex-shrink-0" style={{ background: '#0a0a0a' }}>
             <div className="flex items-center gap-2">
               <div className="w-[6px] h-[6px] rounded-full bg-lime" />
               <span className="text-[13px] font-medium text-text-dim tracking-tight">Rocket Booster</span>
             </div>
+
+            {/* Flow steps in header */}
+            <div className="flex items-center gap-1">
+              {[
+                { icon: <SearchIcon size={10} />, label: 'Learn a task' },
+                { icon: <SparklesIcon size={10} />, label: 'Extract playbook' },
+                { icon: <RocketIcon size={10} />, label: 'Replay at 5x' },
+              ].map((step, i) => (
+                <span key={step.label} className="flex items-center gap-1.5">
+                  {i > 0 && <ChevronRightIcon size={10} className="text-text-muted/40" />}
+                  <span className="flex items-center gap-1 text-[10px] text-text-muted font-mono px-1.5 py-0.5 rounded-md" style={{ background: '#111' }}>
+                    <span className="text-text-muted/60">{step.icon}</span>
+                    {step.label}
+                  </span>
+                </span>
+              ))}
+            </div>
+
             <span className="text-[11px] font-mono text-text-muted tracking-wide">DIMOND HACKS &apos;26</span>
           </header>
 
-          <div className="flex flex-col items-center px-6 pt-14 pb-20">
+          {/* Content — single viewport, vertically centered */}
+          <div className="flex-1 flex flex-col items-center justify-center px-6">
+
             {/* Headline */}
-            <div className="text-center mb-8">
-              <h1 className="font-serif text-[72px] leading-[1.05] tracking-[-0.01em] text-text italic anim-fade-up">
+            <div className="text-center mb-6">
+              <h1 className="font-serif text-[60px] leading-[1.05] tracking-[-0.01em] text-text italic anim-fade-up">
                 Make browser-use<br />agents fly.
               </h1>
-              <p className="text-[15px] text-text-dim mt-5 max-w-[420px] mx-auto leading-[1.6] anim-fade-up" style={{ animationDelay: '80ms' }}>
-                <strong className="text-amber-400">Learn</strong> a task first. Then <strong className="text-lime">Race</strong> with a similar task to see the Playwright rocket.
+              <p className="text-[14px] text-text-dim mt-4 max-w-[400px] mx-auto leading-[1.6] anim-fade-up" style={{ animationDelay: '80ms' }}>
+                <strong className="text-amber-400">Learn</strong> a task, then <strong className="text-lime">Race</strong> to watch Playwright
+                blast through the known steps while the agent handles the rest.
               </p>
             </div>
 
-            {/* Input */}
-            <div className="w-full flex justify-center anim-fade-up" style={{ animationDelay: '150ms' }}>
+            {/* Input + search card dropdown */}
+            <div className="w-full flex flex-col items-center mb-7 anim-fade-up" style={{ animationDelay: '140ms' }}>
               <TaskInput onRun={launch} onLearn={learn} isRunning={false} />
-            </div>
 
-            {/* Drone analogy */}
-            <div className="mt-14 anim-fade-up" style={{ animationDelay: '220ms' }}>
-              <Analogy />
-            </div>
-
-            {/* How it works — compact */}
-            <div className="flex items-start gap-8 mt-14 max-w-[560px] w-full anim-fade-up" style={{ animationDelay: '300ms' }}>
-              {[
-                { n: '01', title: 'Learn', body: 'Agent completes the task. We extract a reusable template and store it.' },
-                { n: '02', title: 'Match', body: 'On similar tasks, we find the template and fill in the new parameters.' },
-                { n: '03', title: 'Fly', body: 'Playwright replays known steps in milliseconds. Agent handles the rest.' },
-              ].map((item) => (
-                <div key={item.n} className="flex-1 text-left">
-                  <span className="text-[10px] font-mono text-text-muted">{item.n}</span>
-                  <h3 className="text-[13px] font-semibold text-text mt-1 mb-1">{item.title}</h3>
-                  <p className="text-[11px] text-text-muted leading-[1.5]">{item.body}</p>
+              {/* Search card — slides open below input when Race is clicked */}
+              {searchingTask && (
+                <div className="mt-3 w-full max-w-[520px]">
+                  <TemplateSearchCard
+                    task={searchingTask}
+                    onRace={startRace}
+                    onLearnInstead={() => learn(searchingTask)}
+                    onDismiss={() => setSearchingTask(null)}
+                  />
                 </div>
-              ))}
+              )}
+            </div>
+
+            {/* Compact analogy with animated speed bars */}
+            <div className="anim-fade-up" style={{ animationDelay: '200ms' }}>
+              <Analogy />
             </div>
 
             {/* Template pills */}
             {templates.length > 0 && (
-              <div className="mt-10 anim-fade-up" style={{ animationDelay: '380ms' }}>
-                <p className="text-[11px] text-text-muted mb-2 text-center">Learned templates ({templates.length}):</p>
+              <div className="mt-5 anim-fade-up" style={{ animationDelay: '300ms' }}>
                 <LearningHistory templates={templates} onSelect={setSelectedTemplate} selectedId={selectedTemplate?.id} />
               </div>
             )}
-            {selectedTemplate && (
-              <div className="mt-5 w-full max-w-[440px]">
-                <TemplateVisualizer steps={selectedTemplate.steps} pattern={selectedTemplate.pattern} confidence={selectedTemplate.confidence} />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ━━━ SEARCHING (pre-race template lookup) ━━━ */}
-      {view === 'searching' && (
-        <div className="flex-1 flex flex-col relative z-10">
-          <header className="flex items-center justify-between px-8 h-12 border-b border-border-subtle">
-            <div className="flex items-center gap-2">
-              <div className="w-[6px] h-[6px] rounded-full bg-lime" />
-              <span className="text-[13px] font-medium text-text-dim tracking-tight">Rocket Booster</span>
-            </div>
-          </header>
-          <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6">
-            <div className="text-center">
-              <p className="text-[14px] text-text-dim font-mono">{currentTask}</p>
-            </div>
-            <TemplateSearchCard
-              task={currentTask}
-              onRace={startRace}
-              onLearnInstead={() => learn(currentTask)}
-              onDismiss={reset}
-            />
           </div>
         </div>
       )}
