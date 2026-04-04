@@ -5,6 +5,7 @@ import { Timer } from './components/Timer';
 import { StepTracker } from './components/StepTracker';
 import { PhaseIndicator } from './components/PhaseIndicator';
 import { ComparisonCard } from './components/ComparisonCard';
+import { TemplateSearchCard } from './components/TemplateSearchCard';
 import { Analogy } from './components/Analogy';
 import { TemplateVisualizer } from './components/TemplateVisualizer';
 import { LearningHistory } from './components/LearningHistory';
@@ -13,7 +14,7 @@ import { useTimer } from './hooks/useTimer';
 import { startCompare, startLearn, getTemplates } from './api';
 import type { Template, Phase } from './types';
 
-type View = 'idle' | 'learning' | 'racing' | 'results';
+type View = 'idle' | 'searching' | 'learning' | 'racing' | 'results';
 
 function App() {
   const [view, setView] = useState<View>('idle');
@@ -55,6 +56,13 @@ function App() {
     setRocketId(null);
     baseTimer.reset();
     rocketTimer.reset();
+    // Show search card first — don't jump straight to racing
+    setView('searching');
+  }, [baseTimer, rocketTimer]);
+
+  // Actually start the race (called from search card or directly)
+  const startRace = useCallback(async () => {
+    const task = currentTask;
     setView('racing');
     try {
       const { baseline_session_id, rocket_session_id } = await startCompare(task);
@@ -63,7 +71,7 @@ function App() {
       baseTimer.start();
       rocketTimer.start();
     } catch { setView('idle'); }
-  }, [baseTimer, rocketTimer]);
+  }, [currentTask, baseTimer, rocketTimer]);
 
   const learn = useCallback(async (task: string) => {
     setCurrentTask(task);
@@ -161,6 +169,29 @@ function App() {
                 <TemplateVisualizer steps={selectedTemplate.steps} pattern={selectedTemplate.pattern} confidence={selectedTemplate.confidence} />
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ━━━ SEARCHING (pre-race template lookup) ━━━ */}
+      {view === 'searching' && (
+        <div className="flex-1 flex flex-col relative z-10">
+          <header className="flex items-center justify-between px-8 h-12 border-b border-border-subtle">
+            <div className="flex items-center gap-2">
+              <div className="w-[6px] h-[6px] rounded-full bg-lime" />
+              <span className="text-[13px] font-medium text-text-dim tracking-tight">Rocket Booster</span>
+            </div>
+          </header>
+          <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6">
+            <div className="text-center">
+              <p className="text-[14px] text-text-dim font-mono">{currentTask}</p>
+            </div>
+            <TemplateSearchCard
+              task={currentTask}
+              onRace={startRace}
+              onLearnInstead={() => learn(currentTask)}
+              onDismiss={reset}
+            />
           </div>
         </div>
       )}

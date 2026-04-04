@@ -412,6 +412,34 @@ async def learn(request: TaskRequest) -> dict:
     return {"session_id": sid}
 
 
+@app.post("/api/search-template")
+async def search_template(request: TaskRequest) -> dict:
+    """Search for a matching template WITHOUT starting a run.
+
+    Returns match info so the frontend can show the search phase
+    before deciding to race.
+    """
+    try:
+        from src.matching.matcher import find_matching_template
+        match = await find_matching_template(request.task)
+        if match and match.similarity >= 0.75:
+            return {
+                "found": True,
+                "template_id": match.template_id,
+                "task_pattern": match.task_pattern,
+                "similarity": round(match.similarity, 3),
+                "confidence": round(match.confidence, 3),
+                "domain": match.domain,
+                "action_type": match.action_type,
+                "playwright_steps": match.handoff_index + 1,
+                "total_steps": len(match.steps),
+            }
+        return {"found": False}
+    except Exception as e:
+        logger.warning("Template search failed: %s", e)
+        return {"found": False, "error": str(e)}
+
+
 @app.post("/api/compare")
 async def compare(request: TaskRequest) -> dict:
     """Start baseline + rocket runs in parallel. Returns session IDs immediately."""

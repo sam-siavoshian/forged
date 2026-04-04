@@ -1,4 +1,6 @@
+import { CheckIcon } from 'lucide-animated';
 import type { Phase } from '../types';
+import { LoadingPinwheel } from './LoadingPinwheel';
 
 interface BrowserEmbedProps {
   liveUrl: string | null;
@@ -38,13 +40,13 @@ export function BrowserEmbed({ liveUrl, phase }: BrowserEmbedProps) {
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             {active ? (
-              <div className={`w-5 h-5 rounded-full border border-t-transparent animate-spin ${
-                phase === 'rocket' ? 'border-lime/20' : 'border-sky/20'
-              }`} />
+              <LoadingPinwheel
+                active
+                size={20}
+                className={phase === 'rocket' ? 'text-lime/40' : 'text-sky/40'}
+              />
             ) : phase === 'complete' ? (
-              <svg className="w-4 h-4 text-lime/25" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
+              <CheckIcon size={16} className="text-lime/25" />
             ) : (
               <div className="w-5 h-px" style={{ background: '#1a1a1a' }} />
             )}

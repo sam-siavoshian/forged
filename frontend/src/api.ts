@@ -50,6 +50,29 @@ export async function getStatus(sessionId: string): Promise<RunStatus> {
   return res.json();
 }
 
+export interface TemplateSearchResult {
+  found: boolean;
+  template_id?: string;
+  task_pattern?: string;
+  similarity?: number;
+  confidence?: number;
+  domain?: string;
+  action_type?: string;
+  playwright_steps?: number;
+  total_steps?: number;
+  error?: string;
+}
+
+export async function searchTemplate(task: string): Promise<TemplateSearchResult> {
+  const res = await fetch(`${API_BASE}/search-template`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task }),
+  });
+  if (!res.ok) return { found: false, error: await res.text() };
+  return res.json();
+}
+
 export async function getTemplates(): Promise<Template[]> {
   const res = await fetch(`${API_BASE}/templates`);
   if (!res.ok) throw new Error(`Failed to get templates: ${await res.text()}`);
