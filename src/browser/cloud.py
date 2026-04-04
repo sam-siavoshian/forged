@@ -35,28 +35,22 @@ class CloudBrowserManager:
 
     async def create(
         self,
-        timeout_minutes: int = 120,
-        proxy_country: str | None = "US",
-        width: int = 1920,
-        height: int = 1080,
-        enable_recording: bool = True,
+        timeout_minutes: int = 60,
     ) -> CloudBrowserSession:
         """Create a BaaS browser and return session metadata including cdpUrl.
 
         Raises httpx.HTTPStatusError on API failure.
         Raises ValueError if the response is missing cdpUrl.
         """
+        body: dict = {}
+        if timeout_minutes != 60:
+            body["timeout"] = timeout_minutes
+
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{BROWSER_USE_API_BASE}/browsers",
                 headers=self._headers(),
-                json={
-                    "timeout": timeout_minutes,
-                    "proxyCountryCode": proxy_country,
-                    "browserScreenWidth": width,
-                    "browserScreenHeight": height,
-                    "enableRecording": enable_recording,
-                },
+                json=body,
                 timeout=30.0,
             )
             response.raise_for_status()
