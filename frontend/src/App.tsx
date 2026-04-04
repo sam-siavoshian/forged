@@ -8,6 +8,7 @@ import { PhaseIndicator } from './components/PhaseIndicator';
 import { ComparisonCard } from './components/ComparisonCard';
 import { TemplateSearchCard } from './components/TemplateSearchCard';
 import { Analogy } from './components/Analogy';
+import { Architecture } from './components/Architecture';
 import { LearningHistory } from './components/LearningHistory';
 import { usePoller } from './hooks/usePoller';
 import { useTimer } from './hooks/useTimer';
@@ -179,6 +180,11 @@ function App() {
             {/* Compact analogy with animated speed bars */}
             <div className="anim-fade-up" style={{ animationDelay: '200ms' }}>
               <Analogy />
+            </div>
+
+            {/* Architecture diagram */}
+            <div className="mt-8 anim-fade-up" style={{ animationDelay: '260ms' }}>
+              <Architecture />
             </div>
 
             {/* Template pills */}
