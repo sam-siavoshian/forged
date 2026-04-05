@@ -2,10 +2,14 @@ interface TimerProps {
   elapsedMs: number;
   isComplete: boolean;
   variant: 'baseline' | 'rocket';
+  /** Server-reported duration when the run finished; keeps UI in sync with /results */
+  durationMs?: number;
 }
 
-export function Timer({ elapsedMs, isComplete, variant }: TimerProps) {
-  const seconds = elapsedMs / 1000;
+export function Timer({ elapsedMs, isComplete, variant, durationMs }: TimerProps) {
+  const ms =
+    isComplete && durationMs != null && durationMs > 0 ? durationMs : elapsedMs;
+  const seconds = ms / 1000;
   const formatted = seconds.toFixed(1);
 
   const color = isComplete

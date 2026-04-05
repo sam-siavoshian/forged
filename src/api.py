@@ -180,6 +180,22 @@ def _fill_parameters(
     return filled
 
 
+def _get_dynamic_step_descriptions(
+    steps: list[dict[str, Any]],
+    handoff_index: int,
+) -> list[str]:
+    """Extract descriptions of DYNAMIC steps after the handoff point.
+
+    These tell the agent what work remains after Playwright finishes
+    (e.g. 'scroll to History section', 'extract creator name').
+    """
+    descs = []
+    for s in steps[handoff_index + 1:]:
+        if s.get("type") == "dynamic" and s.get("description"):
+            descs.append(s["description"])
+    return descs
+
+
 # ---------------------------------------------------------------------------
 # Shared: create cloud browser
 # ---------------------------------------------------------------------------
@@ -234,6 +250,7 @@ async def _run_agent(
     cdp_url: str,
     rocket_result: RocketResult | None = None,
     step_summary: str | None = None,
+    remaining_dynamic_steps: list[str] | None = None,
 ):
     """Run the browser-use agent on the cloud browser. Returns (history, bu_session).
 
@@ -258,7 +275,8 @@ async def _run_agent(
     )
 
     agent_task, rocket_handoff, _handoff_branch = build_agent_handoff_prompt(
-        task, rocket_result, step_summary=step_summary
+        task, rocket_result, step_summary=step_summary,
+        remaining_dynamic_steps=remaining_dynamic_steps,
     )
 
     _agent_step_clock: list[float] = [time.monotonic()]  # mutable container for closure
@@ -556,10 +574,13 @@ async def _run_rocket(session_id: str, task: str) -> None:
                 "playwright",
             )
 
-        # FAST PATH: skip agent if all steps done and page content available
+        # FAST PATH: skip agent if all steps done, no dynamic steps remain,
+        # and page content is available for direct extraction.
+        dynamic_descs = _get_dynamic_step_descriptions(match.steps, match.handoff_index)
         if (not rocket_result.aborted
                 and rocket_result.page_content
-                and rocket_result.steps_completed >= len(filled_steps)):
+                and rocket_result.steps_completed >= len(filled_steps)
+                and not dynamic_descs):
             _step(session_id, "All steps complete. Extracting answer directly...",
                   "playwright", action_type="extract")
             try:
@@ -571,11 +592,13 @@ async def _run_rocket(session_id: str, task: str) -> None:
                 logger.warning("Fast extraction failed in _run_rocket, falling back: %s", extract_err)
                 _update(session_id, phase="agent")
                 _step(session_id, "Handing off to agent...", "agent")
-                _history, bu_session = await _run_agent(session_id, task, cdp_url, rocket_result)
+                dynamic_descs = _get_dynamic_step_descriptions(match.steps, match.handoff_index)
+                _history, bu_session = await _run_agent(session_id, task, cdp_url, rocket_result, remaining_dynamic_steps=dynamic_descs)
         else:
             _update(session_id, phase="agent")
             _step(session_id, "Handing off to agent for dynamic steps...", "agent")
-            _history, bu_session = await _run_agent(session_id, task, cdp_url, rocket_result)
+            dynamic_descs = _get_dynamic_step_descriptions(match.steps, match.handoff_index)
+            _history, bu_session = await _run_agent(session_id, task, cdp_url, rocket_result, remaining_dynamic_steps=dynamic_descs)
 
         elapsed = time.monotonic() * 1000 - start_ms
         _update(session_id, status="complete", phase="complete", duration_ms=elapsed, current_step="Done")
@@ -781,7 +804,8 @@ async def _run_chat(session_id: str, task: str) -> None:
             if not extraction_done:
                 _update(session_id, phase="agent")
                 _step(session_id, "Handing off to agent...", "agent", action_type="agent_action")
-                history, bu_session = await _run_agent(session_id, task, cdp_url, rocket_result, step_summary=step_summary)
+                dynamic_descs = _get_dynamic_step_descriptions(match.steps, match.handoff_index)
+                history, bu_session = await _run_agent(session_id, task, cdp_url, rocket_result, step_summary=step_summary, remaining_dynamic_steps=dynamic_descs)
                 _extract_and_store_result(session_id, history)
 
         else:
