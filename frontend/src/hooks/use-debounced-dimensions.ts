@@ -1,4 +1,4 @@
-import { useState, useEffect, type RefObject } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 
 interface Dimensions {
   width: number;
@@ -24,6 +24,7 @@ export function useDimensions(ref: RefObject<HTMLElement | SVGElement | null>): 
     };
 
     updateDimensions();
+
     window.addEventListener('resize', debouncedUpdateDimensions);
 
     return () => {

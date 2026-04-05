@@ -32,30 +32,29 @@ const PixelTrail: React.FC<PixelTrailProps> = ({
       const x = Math.floor((e.clientX - rect.left) / pixelSize);
       const y = Math.floor((e.clientY - rect.top) / pixelSize);
 
-      const pixelElement = document.getElementById(
-        `${trailId.current}-pixel-${x}-${y}`
-      );
+      const pixelElement = document.getElementById(`${trailId.current}-pixel-${x}-${y}`);
       if (pixelElement) {
-        const animatePixel = (pixelElement as any).__animatePixel;
+        const animatePixel = (pixelElement as HTMLElement & { __animatePixel?: () => void })
+          .__animatePixel;
         if (animatePixel) animatePixel();
       }
     },
-    [pixelSize]
+    [pixelSize],
   );
 
   const columns = useMemo(
-    () => Math.ceil(dimensions.width / pixelSize),
-    [dimensions.width, pixelSize]
+    () => Math.ceil(dimensions.width / pixelSize) || 0,
+    [dimensions.width, pixelSize],
   );
   const rows = useMemo(
-    () => Math.ceil(dimensions.height / pixelSize),
-    [dimensions.height, pixelSize]
+    () => Math.ceil(dimensions.height / pixelSize) || 0,
+    [dimensions.height, pixelSize],
   );
 
   return (
     <div
       ref={containerRef}
-      className={cn('absolute inset-0 w-full h-full pointer-events-auto', className)}
+      className={cn('absolute inset-0 h-full w-full pointer-events-auto', className)}
       onMouseMove={handleMouseMove}
     >
       {Array.from({ length: rows }).map((_, rowIndex) => (
@@ -89,7 +88,7 @@ const PixelDot: React.FC<PixelDotProps> = React.memo(
     const controls = useAnimationControls();
 
     const animatePixel = useCallback(() => {
-      controls.start({
+      void controls.start({
         opacity: [1, 0],
         transition: { duration: fadeDuration / 1000, delay: delay / 1000 },
       });
@@ -98,25 +97,29 @@ const PixelDot: React.FC<PixelDotProps> = React.memo(
     const ref = useCallback(
       (node: HTMLDivElement | null) => {
         if (node) {
-          (node as any).__animatePixel = animatePixel;
+          (node as HTMLElement & { __animatePixel?: () => void }).__animatePixel = animatePixel;
         }
       },
-      [animatePixel]
+      [animatePixel],
     );
 
     return (
       <motion.div
         id={id}
         ref={ref}
-        className={cn('cursor-pointer-none', className)}
-        style={{ width: `${size}px`, height: `${size}px` }}
+        className={cn(className)}
+        style={{
+          width: `${size}px`,
+          height: `${size}px`,
+        }}
         initial={{ opacity: 0 }}
         animate={controls}
         exit={{ opacity: 0 }}
       />
     );
-  }
+  },
 );
 
 PixelDot.displayName = 'PixelDot';
+
 export { PixelTrail };
