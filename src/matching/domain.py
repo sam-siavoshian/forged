@@ -12,6 +12,8 @@ from functools import lru_cache
 
 from anthropic import Anthropic
 
+from src import config
+
 logger = logging.getLogger(__name__)
 
 _anthropic_client: Anthropic | None = None
@@ -37,7 +39,8 @@ def extract_domain(task_description: str) -> str | None:
         return url_match.group(1).lower()
 
     # Strategy 2: Look for domain-like patterns without protocol
-    domain_pattern = r"\b([a-zA-Z0-9-]+\.(?:com|org|net|io|co|dev|app|edu|gov|me))\b"
+    tld_alternation = "|".join(re.escape(t) for t in config.DOMAIN_TLDS)
+    domain_pattern = rf"\b([a-zA-Z0-9-]+\.(?:{tld_alternation}))\b"
     domain_match = re.search(domain_pattern, task_description)
     if domain_match:
         return domain_match.group(1).lower()
@@ -52,7 +55,7 @@ def _llm_extract_domain(task_description: str) -> str | None:
     client = _get_anthropic()
 
     response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model=config.MODEL_DOMAIN_EXTRACTOR,
         max_tokens=30,
         system=(
             "Extract the website domain the user wants to visit. "

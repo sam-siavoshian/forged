@@ -48,6 +48,7 @@ except ImportError:
     _db_list_templates = None  # type: ignore[assignment]
     _db_delete_template = None  # type: ignore[assignment]
 
+from src import config
 from src.models import (
     OrchestratorResult,
     OrchestratorSessionState,
@@ -92,9 +93,9 @@ class RocketOrchestrator:
     and provides session state for real-time frontend updates.
     """
 
-    SIMILARITY_THRESHOLD = 0.50
-    MAX_AGENT_STEPS = 25
-    STEP_TIMEOUT_S = 30
+    SIMILARITY_THRESHOLD = config.SIMILARITY_THRESHOLD
+    MAX_AGENT_STEPS = config.ORCHESTRATOR_MAX_AGENT_STEPS
+    STEP_TIMEOUT_S = config.ORCHESTRATOR_STEP_TIMEOUT_S
 
     def __init__(
         self,
@@ -102,12 +103,12 @@ class RocketOrchestrator:
         anthropic_client: Any,
         browser_use_api_key: str,
         *,
-        model: str = "claude-sonnet-4-20250514",
+        model: str | None = None,
     ):
         self._db = supabase_client
         self._anthropic = anthropic_client
         self._browser_use_api_key = browser_use_api_key
-        self._model = model
+        self._model = model or config.MODEL_AGENT
 
         self._sessions: dict[str, OrchestratorSessionState] = {}
 

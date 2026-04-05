@@ -78,7 +78,7 @@ async def _search_via_pgvector(
         rows = await pool.fetch(
             f"""
             SELECT id, task_pattern, steps, handoff_index, parameters, confidence,
-                   action_type, domain,
+                   action_type, domain, extraction_selectors,
                    1 - (embedding <=> $1::vector) AS similarity
             FROM task_templates
             WHERE confidence >= {config.DB_MIN_CONFIDENCE}
@@ -113,7 +113,7 @@ async def _search_via_rest(
 
     query = client.table("task_templates").select(
         "id, task_pattern, steps, handoff_index, parameters, confidence, "
-        "action_type, domain, embedding"
+        "action_type, domain, embedding, extraction_selectors"
     ).gte("confidence", config.DB_MIN_CONFIDENCE)
     result = query.execute()
 
@@ -196,14 +196,14 @@ async def find_matching_template(
     similarity = float(row.get("similarity", 0))
 
     # Apply similarity threshold — 0.50 minimum (medium band reaches LLM verifier)
-    if similarity < 0.50:
-        logger.info("Best match similarity %.3f below 0.50 threshold", similarity)
+    if similarity < config.SIMILARITY_THRESHOLD:
+        logger.info("Best match similarity %.3f below %.2f threshold", similarity, config.SIMILARITY_THRESHOLD)
         return None
 
     # Determine confidence band
-    if similarity >= 0.90:
+    if similarity >= config.SIMILARITY_VERY_HIGH:
         band = "very_high"
-    elif similarity >= 0.75:
+    elif similarity >= config.SIMILARITY_HIGH:
         band = "high"
     else:
         band = "medium"

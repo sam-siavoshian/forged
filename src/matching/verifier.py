@@ -8,6 +8,8 @@ import logging
 
 from anthropic import AsyncAnthropic
 
+from src import config
+
 logger = logging.getLogger(__name__)
 
 VERIFIER_SYSTEM = (
@@ -56,7 +58,7 @@ async def verify_template_match(
     )
 
     response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model=config.MODEL_VERIFIER,
         max_tokens=8,
         system=VERIFIER_SYSTEM,
         messages=[{"role": "user", "content": user_prompt}],

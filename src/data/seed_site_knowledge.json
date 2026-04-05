@@ -1,0 +1,57 @@
+[
+  {
+    "domain": "amazon.com",
+    "selector_map": {
+      "search_input": [
+        "#twotabsearchtextbox",
+        "input[name='field-keywords']",
+        "[aria-label='Search Amazon']"
+      ],
+      "search_button": [
+        "#nav-search-submit-button",
+        "input[type='submit'][value='Go']"
+      ],
+      "cart_button": ["#nav-cart", "#nav-cart-count"],
+      "add_to_cart": [
+        "#add-to-cart-button",
+        "[name='submit.add-to-cart']"
+      ],
+      "buy_now": ["#buy-now-button", "#submitOrderButtonId"]
+    },
+    "navigation_patterns": {
+      "to_search": [
+        "navigate(https://amazon.com)",
+        "click(search_input)"
+      ],
+      "to_cart": ["click(cart_button)"]
+    },
+    "page_load_signals": {
+      "search_results": ".s-result-list",
+      "product_page": "#productTitle",
+      "cart_page": "#sc-active-cart"
+    }
+  },
+  {
+    "domain": "google.com",
+    "selector_map": {
+      "search_input": [
+        "textarea[name='q']",
+        "input[name='q']",
+        "[aria-label='Search']"
+      ],
+      "search_button": [
+        "input[name='btnK']",
+        "button[aria-label='Google Search']"
+      ]
+    },
+    "navigation_patterns": {
+      "to_search": [
+        "navigate(https://google.com)",
+        "click(search_input)"
+      ]
+    },
+    "page_load_signals": {
+      "search_results": "#search"
+    }
+  }
+]

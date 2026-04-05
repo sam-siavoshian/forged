@@ -19,6 +19,7 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 
+from src import config
 from src.template.generator import InternalTemplate
 from src.template.simplifier import SimplifiedTrace
 
@@ -77,7 +78,7 @@ async def refine_template(
     trace: SimplifiedTrace,
     success: bool,
     client: AsyncAnthropic | None = None,
-    model: str = "claude-sonnet-4-6",
+    model: str | None = None,
     min_confidence: float = 0.8,
 ) -> list[dict[str, Any]]:
     """
@@ -98,6 +99,8 @@ async def refine_template(
     """
     if client is None:
         client = AsyncAnthropic()
+    if model is None:
+        model = config.MODEL_ANALYZER
 
     template_json = _template_to_json(template)
     trace_json = json.dumps(trace.steps_as_dicts(), indent=2)

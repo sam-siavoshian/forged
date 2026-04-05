@@ -14,6 +14,7 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 
+from src import config
 from src.template.analyzer import analyze_trace
 from src.template.generator import InternalTemplate, generate_template, template_to_db_format
 from src.template.simplifier import SimplifiedTrace, simplify_trace
@@ -31,7 +32,7 @@ async def extract_template_from_trace(
     history: Any,  # AgentHistoryList from browser-use
     task_description: str,
     client: AsyncAnthropic | None = None,
-    model: str = "claude-sonnet-4-6",
+    model: str | None = None,
 ) -> InternalTemplate:
     """
     Full extraction pipeline: raw trace → simplified → analyzed → template → validated.
@@ -49,6 +50,8 @@ async def extract_template_from_trace(
         ValueError: If validation finds ERROR-level issues.
         ValueError: If LLM returns unparseable output.
     """
+    if model is None:
+        model = config.MODEL_ANALYZER
     if client is None:
         client = AsyncAnthropic()
 
@@ -132,7 +135,7 @@ async def extract_parameters(
     task: str,
     template: InternalTemplate | dict[str, Any],
     client: AsyncAnthropic | None = None,
-    model: str = "claude-haiku-4-5-20251001",
+    model: str | None = None,
 ) -> dict[str, str | None]:
     """
     Extract parameter values from a task description using the template's pattern.
@@ -151,6 +154,8 @@ async def extract_parameters(
     Raises:
         ValueError: If required parameters can't be extracted.
     """
+    if model is None:
+        model = config.MODEL_PARAM_EXTRACTOR
     if client is None:
         client = AsyncAnthropic()
 

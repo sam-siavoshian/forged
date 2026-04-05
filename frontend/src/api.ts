@@ -95,3 +95,18 @@ export async function getChatSessions(): Promise<ChatSessionSummary[]> {
   if (!res.ok) return [];
   return res.json();
 }
+
+export interface RaceHistoryEntry {
+  task: string;
+  baseline_duration_ms: number;
+  rocket_duration_ms: number;
+  speedup: number;
+  rocket_steps: number | null;
+  created_at: string;
+}
+
+export async function getRaceHistory(): Promise<RaceHistoryEntry[]> {
+  const res = await fetch(`${API_BASE}/race-history`);
+  if (!res.ok) return [];
+  return res.json();
+}

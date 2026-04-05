@@ -17,6 +17,7 @@ from typing import Any
 
 from anthropic import AsyncAnthropic
 
+from src import config
 from src.template.simplifier import SimplifiedTrace
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,19 @@ to the index of the last step. The goal is to have Playwright handle as many ste
 as possible before handing off to the agent.
 - "estimated_time_saved_seconds": rough estimate of time saved by the deterministic prefix
 - "preconditions": any requirements (e.g., "requires_auth", "requires_javascript")
+- "extraction_selectors": (IMPORTANT for data_extraction / search / extract tasks) \
+If the task involves extracting specific data from the page (titles, prices, ratings, \
+text content, etc.), provide a JSON object mapping human-readable field names to CSS \
+selectors that can be used to read those values directly from the DOM after all \
+navigational steps complete. Each entry should have: "selector" (primary CSS selector), \
+"fallback_selectors" (1-2 alternatives), and "description" (what this field contains). \
+Set to null if the task does NOT involve data extraction (e.g., purchase, form_fill, \
+login). Example: \
+{{"title": {{"selector": "h1.article-title", "fallback_selectors": ["h1", ".title"], \
+"description": "Article title"}}, \
+"content": {{"selector": "#article-body p:first-of-type", \
+"fallback_selectors": [".article-content p:first-of-type"], \
+"description": "First paragraph of article"}}}}
 
 Respond with this exact JSON structure:
 {{
@@ -132,7 +146,8 @@ Respond with this exact JSON structure:
   ],
   "handoff_index": 5,
   "estimated_time_saved_seconds": 8.0,
-  "preconditions": []
+  "preconditions": [],
+  "extraction_selectors": null
 }}\
 """
 
@@ -145,7 +160,7 @@ Respond with this exact JSON structure:
 async def analyze_trace(
     simplified_trace: SimplifiedTrace,
     client: AsyncAnthropic | None = None,
-    model: str = "claude-sonnet-4-6",
+    model: str | None = None,
 ) -> dict[str, Any]:
     """
     Send the simplified trace to Claude for classification and template extraction.
@@ -161,6 +176,8 @@ async def analyze_trace(
     Raises:
         ValueError: If the LLM returns invalid JSON.
     """
+    if model is None:
+        model = config.MODEL_ANALYZER
     if client is None:
         client = AsyncAnthropic()
 

@@ -14,6 +14,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
+from src import config
+
 logger = logging.getLogger(__name__)
 
 
@@ -108,7 +110,7 @@ async def filter_steps(
     """
     # If only 1-2 steps, no point filtering
     rocket_steps = [s for i, s in enumerate(steps) if i <= handoff_index]
-    if len(rocket_steps) <= 2:
+    if len(rocket_steps) <= config.STEP_FILTER_MIN_STEPS:
         indices = list(range(len(rocket_steps)))
         return StepFilterResult(
             execute_indices=indices,
@@ -139,8 +141,8 @@ async def filter_steps(
         user_prompt = _build_user_prompt(task, task_pattern, steps, parameters, handoff_index)
 
         response = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
+            model=config.MODEL_STEP_FILTER,
+            max_tokens=config.STEP_FILTER_MAX_TOKENS,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
         )

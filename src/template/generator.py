@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from src import config
+
 
 # ──────────────────────────────────────────────────────────────
 # Internal template types (richer than shared models — used
@@ -73,6 +75,7 @@ class InternalTemplate:
     failure_count: int = 0
     confidence: float = 0.5
     estimated_time_saved_seconds: float = 0.0
+    extraction_selectors: dict[str, Any] | None = None
 
 
 # ──────────────────────────────────────────────────────────────
@@ -146,6 +149,23 @@ def generate_template(
     raw_handoff = analysis.get("handoff_index", 0)
     handoff_index = max(0, min(raw_handoff, len(steps) - 1)) if steps else 0
 
+    # Build extraction_selectors from the LLM analysis.
+    # The analyzer returns this for data extraction / search tasks.
+    raw_extraction = analysis.get("extraction_selectors")
+    extraction_selectors = None
+    if raw_extraction and isinstance(raw_extraction, dict):
+        # Validate structure: each entry needs at least a "selector" string
+        validated = {}
+        for key, config in raw_extraction.items():
+            if isinstance(config, dict) and config.get("selector"):
+                validated[key] = {
+                    "selector": config["selector"],
+                    "fallback_selectors": config.get("fallback_selectors", []),
+                    "description": config.get("description", key),
+                }
+        if validated:
+            extraction_selectors = validated
+
     return InternalTemplate(
         template_id=template_id,
         domain=analysis.get("domain", ""),
@@ -161,6 +181,7 @@ def generate_template(
         estimated_time_saved_seconds=analysis.get(
             "estimated_time_saved_seconds", 0.0
         ),
+        extraction_selectors=extraction_selectors,
     )
 
 
@@ -225,7 +246,7 @@ def template_to_db_format(template: InternalTemplate) -> dict[str, Any]:
         for p in template.parameters
     ]
 
-    return {
+    result = {
         "domain": template.domain,
         "action_type": template.action_type,
         "task_pattern": template.task_pattern,
@@ -233,6 +254,11 @@ def template_to_db_format(template: InternalTemplate) -> dict[str, Any]:
         "steps": steps_for_db,
         "handoff_index": template.handoff_index,
     }
+
+    if template.extraction_selectors:
+        result["extraction_selectors"] = template.extraction_selectors
+
+    return result
 
 
 # ──────────────────────────────────────────────────────────────
@@ -257,17 +283,7 @@ def _infer_parameter_field(action: str, param_info: dict | None) -> str | None:
 
 def _infer_wait_time(action: str) -> int:
     """Estimate ms to wait after an action for the page to settle."""
-    wait_map = {
-        "navigate": 2000,
-        "click": 1000,
-        "input": 200,
-        "send_keys": 500,
-        "search": 2000,
-        "go_back": 1500,
-        "select_dropdown": 500,
-        "scroll": 300,
-    }
-    return wait_map.get(action, 100)
+    return config.ACTION_WAIT_MS.get(action, config.ACTION_WAIT_DEFAULT)
 
 
 def _action_timeout_ms(action: str) -> int:
@@ -276,16 +292,4 @@ def _action_timeout_ms(action: str) -> int:
     Navigate needs the most time since it waits for domcontentloaded.
     Selector-based actions need enough time for elements to appear.
     """
-    timeout_map = {
-        "navigate": 15000,
-        "click": 5000,
-        "fill": 5000,
-        "input": 5000,
-        "press": 3000,
-        "send_keys": 3000,
-        "wait": 5000,
-        "scroll": 2000,
-        "select_dropdown": 5000,
-        "go_back": 10000,
-    }
-    return timeout_map.get(action, 5000)
+    return config.ACTION_TIMEOUT_MS.get(action, config.ACTION_TIMEOUT_DEFAULT)

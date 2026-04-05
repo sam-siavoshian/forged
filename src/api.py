@@ -24,6 +24,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from src import config
 from src.browser.agent_handoff import build_agent_handoff_prompt
 from src.models import RocketResult, TemplateStep
 
@@ -121,7 +122,6 @@ def _step(
 # Session garbage collection — prune completed sessions after 5 minutes
 # ---------------------------------------------------------------------------
 
-SESSION_TTL_SECONDS = 300
 
 
 async def _session_gc_loop() -> None:
@@ -131,7 +131,7 @@ async def _session_gc_loop() -> None:
         now = time.time()
         expired = [
             sid for sid, s in sessions.items()
-            if s.completed_at and (now - s.completed_at) > SESSION_TTL_SECONDS
+            if s.completed_at and (now - s.completed_at) > config.SESSION_TTL_SECONDS
         ]
         for sid in expired:
             del sessions[sid]
@@ -246,15 +246,15 @@ async def _run_agent(
 
     try:
         from browser_use import ChatAnthropic as BUChat
-        llm = BUChat(model="claude-sonnet-4-6", temperature=0, max_tokens=8096)
+        llm = BUChat(model=config.MODEL_AGENT, temperature=0, max_tokens=config.AGENT_MAX_TOKENS)
     except ImportError:
         from langchain_anthropic import ChatAnthropic
-        llm = ChatAnthropic(model="claude-sonnet-4-6", temperature=0, max_tokens=8096)
+        llm = ChatAnthropic(model=config.MODEL_AGENT, temperature=0, max_tokens=config.AGENT_MAX_TOKENS)
 
     bu_session = BUSession(
         cdp_url=cdp_url,
         keep_alive=True,
-        wait_for_network_idle_page_load_time=12.0,
+        wait_for_network_idle_page_load_time=config.AGENT_NETWORK_IDLE_TIMEOUT,
     )
 
     agent_task, rocket_handoff, _handoff_branch = build_agent_handoff_prompt(
@@ -283,8 +283,8 @@ async def _run_agent(
         task=agent_task,
         llm=llm,
         browser_session=bu_session,
-        max_failures=5,
-        max_actions_per_step=5,
+        max_failures=config.AGENT_MAX_FAILURES,
+        max_actions_per_step=config.AGENT_MAX_ACTIONS_PER_STEP,
         register_new_step_callback=on_step,
         # Disable URL auto-detection after rocket handoff — the browser is
         # already on the right page, re-navigating wastes ~8s.
@@ -308,14 +308,14 @@ async def _extract_answer_from_page(task: str, page_text: str) -> str:
 
     client = AsyncAnthropic()
     response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model=config.MODEL_ANSWER_EXTRACTOR,
         max_tokens=1024,
         messages=[{
             "role": "user",
             "content": (
                 f"Task: {task}\n\n"
                 f"Page content (visible text from the browser):\n"
-                f"{page_text[:8000]}\n\n"
+                f"{page_text[:config.LLM_INPUT_TEXT_CAP]}\n\n"
                 f"Extract the answer to the task from the page content above. "
                 f"Be concise and direct. Return only the requested information."
             ),
@@ -744,7 +744,7 @@ async def _run_chat(session_id: str, task: str) -> None:
 
             # TIER 0: Direct DOM extraction — zero LLM calls
             if (match.extraction_selectors
-                    and match.similarity >= 0.90
+                    and match.similarity >= config.DIRECT_EXTRACT_MIN_SIMILARITY
                     and not rocket_result.aborted
                     and rocket_result.steps_completed > 0):
                 _step(session_id, "Attempting direct DOM extraction...", "playwright", action_type="extract")

@@ -8,6 +8,8 @@ import time
 from browser_use import Agent, BrowserSession
 from langchain_anthropic import ChatAnthropic
 
+from src import config
+
 from src.browser.agent_handoff import build_agent_handoff_prompt
 from src.browser.session_cleanup import release_browser_session
 from src.models import AgentResult, RocketResult
@@ -20,17 +22,17 @@ class BrowserUseAgent:
 
     def __init__(
         self,
-        model: str = "claude-sonnet-4-6",
+        model: str | None = None,
         temperature: float = 0,
-        max_tokens: int = 8096,
-        max_failures: int = 5,
-        max_actions_per_step: int = 5,
+        max_tokens: int | None = None,
+        max_failures: int | None = None,
+        max_actions_per_step: int | None = None,
     ):
-        self._model = model
+        self._model = model or config.MODEL_AGENT
         self._temperature = temperature
-        self._max_tokens = max_tokens
-        self._max_failures = max_failures
-        self._max_actions_per_step = max_actions_per_step
+        self._max_tokens = max_tokens or config.AGENT_MAX_TOKENS
+        self._max_failures = max_failures or config.AGENT_MAX_FAILURES
+        self._max_actions_per_step = max_actions_per_step or config.AGENT_MAX_ACTIONS_PER_STEP
 
     async def run(
         self,

@@ -10,13 +10,14 @@ import { PhaseIndicator } from './components/PhaseIndicator';
 import { ComparisonCard } from './components/ComparisonCard';
 import { TemplateSearchCard } from './components/TemplateSearchCard';
 import { ChatPage } from './pages/ChatPage';
+import { BenchmarksPage } from './components/BenchmarksPage';
 import { DocsLayout } from './pages/docs/DocsLayout';
 import { usePoller } from './hooks/usePoller';
 import { useTimer } from './hooks/useTimer';
 import { startCompare, startLearn, getTemplates } from './api';
 import type { Template, Phase } from './types';
 
-type View = 'chat' | 'chat_session' | 'learning' | 'racing' | 'results';
+type View = 'chat' | 'chat_session' | 'learning' | 'racing' | 'results' | 'benchmarks';
 
 function pathToView(pathname: string): View {
   const p = pathname.replace(/\/+$/, '') || '/';
@@ -26,6 +27,7 @@ function pathToView(pathname: string): View {
   if (p === '/rl/learn') return 'learning';
   if (p === '/rl/race') return 'racing';
   if (p === '/rl/results') return 'results';
+  if (p === '/benchmarks') return 'benchmarks';
   if (p === '/race') return 'racing';
   if (p === '/results') return 'results';
   return 'chat';
@@ -85,7 +87,7 @@ function App() {
 
   useEffect(() => {
     const p = location.pathname.replace(/\/+$/, '') || '/';
-    const allowed = ['/', '/learn', '/race', '/results', '/rl/learn', '/rl/race', '/rl/results'];
+    const allowed = ['/', '/learn', '/race', '/results', '/rl/learn', '/rl/race', '/rl/results', '/benchmarks'];
     if (!allowed.includes(p) && !p.startsWith('/chat/') && !p.startsWith('/learn/') && !p.startsWith('/docs')) {
       navigate('/learn', { replace: true });
     }
@@ -488,6 +490,11 @@ function App() {
         )}
         {view === 'results' && baseStatus && rocketStatus && (
           <ComparisonCard baselineDurationMs={baseStatus.duration_ms} rocketDurationMs={rocketStatus.duration_ms} onReset={reset} />
+        )}
+
+        {/* ═══ BENCHMARKS VIEW ═══ */}
+        {view === 'benchmarks' && (
+          <BenchmarksPage />
         )}
       </div>
     </div>

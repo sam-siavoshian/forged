@@ -9,6 +9,7 @@ import logging
 import os
 from typing import Any
 
+from src import config
 from .embeddings import build_embedding_text, generate_embedding
 from .site_knowledge import get_site_knowledge
 
@@ -31,6 +32,7 @@ async def create_template(
     parameters: list[dict[str, Any]],
     steps: list[dict[str, Any]],
     handoff_index: int,
+    extraction_selectors: dict[str, Any] | None = None,
 ) -> str:
     """Create a new task template. Generates a rich composite embedding.
 
@@ -58,7 +60,7 @@ async def create_template(
     embedding = generate_embedding(rich_text)
 
     client = _get_supabase()
-    result = client.table("task_templates").insert({
+    row_data = {
         "domain": domain,
         "action_type": action_type,
         "task_pattern": task_pattern,
@@ -66,7 +68,10 @@ async def create_template(
         "steps": steps,
         "handoff_index": handoff_index,
         "embedding": json.dumps(embedding),
-    }).execute()
+    }
+    if extraction_selectors:
+        row_data["extraction_selectors"] = extraction_selectors
+    result = client.table("task_templates").insert(row_data).execute()
 
     return str(result.data[0]["id"])
 
@@ -150,11 +155,11 @@ async def update_template_after_execution(
 
         # Update confidence
         if success:
-            new_confidence = old_confidence + 0.1 * (1.0 - old_confidence)
+            new_confidence = old_confidence + config.CONFIDENCE_SUCCESS_INCREMENT * (1.0 - old_confidence)
             new_success = old_success + 1
             new_failure = old_failure
         else:
-            new_confidence = old_confidence - 0.2 * old_confidence
+            new_confidence = old_confidence - config.CONFIDENCE_FAILURE_DECREMENT * old_confidence
             new_success = old_success
             new_failure = old_failure + 1
 

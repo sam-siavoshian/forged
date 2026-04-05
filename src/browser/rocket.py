@@ -14,6 +14,7 @@ from playwright.async_api import (
     async_playwright,
 )
 
+from src import config
 from src.models import RocketResult, TemplateStep
 
 logger = logging.getLogger("rocket_booster.rocket")
@@ -73,7 +74,7 @@ def _click_label_candidates(step: TemplateStep) -> list[str]:
 
 
 async def _try_click_role_option(page: Page, label: str, timeout_ms: int) -> bool:
-    """Amazon/native <select> options expose role=option; CSS often breaks after DOM churn."""
+    """Native <select> options often expose role=option; CSS selectors can break after DOM mutations."""
     try:
         loc = page.get_by_role("option", name=label, exact=False)
         first = loc.first
@@ -101,9 +102,9 @@ async def _try_selector(
         # First attempt: full budget (capped). Later: fast-fail — templates often
         # store redundant fallbacks that all miss after a site redesign.
         if i == 0:
-            budget = min(step.timeout_ms, 8000)
+            budget = min(step.timeout_ms, config.SELECTOR_PRIMARY_BUDGET_CAP)
         else:
-            budget = min(2000, max(800, step.timeout_ms // 3))
+            budget = min(config.SELECTOR_FALLBACK_CAP, max(config.SELECTOR_FALLBACK_FLOOR, step.timeout_ms // 3))
 
         try:
             await page.wait_for_selector(
@@ -123,7 +124,7 @@ async def _try_selector(
 
 async def _execute_click(page: Page, step: TemplateStep, step_index: int) -> None:
     """Click via CSS selector, then role=option by aria-label/value if CSS is stale."""
-    role_budget = min(3500, max(1500, step.timeout_ms))
+    role_budget = min(config.SELECTOR_ROLE_BUDGET_MAX, max(config.SELECTOR_ROLE_BUDGET_MIN, step.timeout_ms))
     try:
         selector = await _try_selector(page, step, step_index)
         await page.click(selector)

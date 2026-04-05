@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS task_templates (
     avg_agent_duration_ms INTEGER,
     avg_total_duration_ms INTEGER,
     avg_baseline_duration_ms INTEGER,
+    extraction_selectors JSONB DEFAULT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -72,6 +73,17 @@ CREATE TABLE IF NOT EXISTS site_knowledge (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Migration: add extraction_selectors if missing (idempotent)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'task_templates' AND column_name = 'extraction_selectors'
+    ) THEN
+        ALTER TABLE task_templates ADD COLUMN extraction_selectors JSONB DEFAULT NULL;
+    END IF;
+END $$;
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_templates_domain
@@ -111,63 +123,27 @@ CREATE TRIGGER trigger_site_knowledge_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 """
 
-SEED_SITE_KNOWLEDGE = [
-    {
-        "domain": "amazon.com",
-        "selector_map": {
-            "search_input": [
-                "#twotabsearchtextbox",
-                "input[name='field-keywords']",
-                "[aria-label='Search Amazon']",
-            ],
-            "search_button": [
-                "#nav-search-submit-button",
-                "input[type='submit'][value='Go']",
-            ],
-            "cart_button": ["#nav-cart", "#nav-cart-count"],
-            "add_to_cart": [
-                "#add-to-cart-button",
-                "[name='submit.add-to-cart']",
-            ],
-            "buy_now": ["#buy-now-button", "#submitOrderButtonId"],
-        },
-        "navigation_patterns": {
-            "to_search": [
-                "navigate(https://amazon.com)",
-                "click(search_input)",
-            ],
-            "to_cart": ["click(cart_button)"],
-        },
-        "page_load_signals": {
-            "search_results": ".s-result-list",
-            "product_page": "#productTitle",
-            "cart_page": "#sc-active-cart",
-        },
-    },
-    {
-        "domain": "google.com",
-        "selector_map": {
-            "search_input": [
-                "textarea[name='q']",
-                "input[name='q']",
-                "[aria-label='Search']",
-            ],
-            "search_button": [
-                "input[name='btnK']",
-                "button[aria-label='Google Search']",
-            ],
-        },
-        "navigation_patterns": {
-            "to_search": [
-                "navigate(https://google.com)",
-                "click(search_input)",
-            ],
-        },
-        "page_load_signals": {
-            "search_results": "#search",
-        },
-    },
-]
+def _load_seed_site_knowledge() -> list[dict]:
+    """Load seed site knowledge from external JSON file.
+
+    The seed data lives in src/data/seed_site_knowledge.json so it can be
+    edited without touching Python code. Returns an empty list if the file
+    is missing (non-fatal — site knowledge is optional).
+    """
+    seed_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "data",
+        "seed_site_knowledge.json",
+    )
+    try:
+        with open(seed_path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"  Warning: seed file not found at {seed_path}, skipping seed data")
+        return []
+    except json.JSONDecodeError as e:
+        print(f"  Warning: invalid JSON in {seed_path}: {e}")
+        return []
 
 
 async def run_setup() -> None:
@@ -193,7 +169,7 @@ async def run_setup() -> None:
 
         # Seed site knowledge
         print("Seeding site knowledge...")
-        for site in SEED_SITE_KNOWLEDGE:
+        for site in _load_seed_site_knowledge():
             await conn.execute(
                 """
                 INSERT INTO site_knowledge

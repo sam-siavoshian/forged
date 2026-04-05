@@ -9,6 +9,8 @@ from functools import lru_cache
 
 from anthropic import Anthropic
 
+from src import config
+
 logger = logging.getLogger(__name__)
 
 _anthropic_client: Anthropic | None = None
@@ -21,10 +23,7 @@ def _get_anthropic() -> Anthropic:
     return _anthropic_client
 
 
-VALID_ACTION_TYPES = {
-    "purchase", "search", "form_fill", "navigate",
-    "extract", "login", "interact",
-}
+VALID_ACTION_TYPES = config.ACTION_TYPES
 
 
 def classify_action_type(task_description: str) -> str | None:
@@ -42,7 +41,7 @@ def _llm_classify_action(task_description: str) -> str | None:
     client = _get_anthropic()
 
     response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model=config.MODEL_ACTION_CLASSIFIER,
         max_tokens=15,
         system=(
             "Classify the browser task into exactly ONE action type. "

@@ -5,6 +5,7 @@ import {
   MessageCircleIcon,
   BrainIcon,
   ZapIcon,
+  GaugeIcon,
   LayersIcon,
   MenuIcon,
   XIcon,
@@ -14,6 +15,7 @@ import {
   type ZapIconHandle,
   type FileTextIconHandle,
   type LayersIconHandle,
+  type GaugeIconHandle,
 } from 'lucide-animated';
 import type { Template } from '../types';
 
@@ -33,6 +35,7 @@ export function AppSidebar({ templates, sidebarOpen, onToggle, collapsed, onColl
 
   const brainIconRef = useRef<BrainIconHandle>(null);
   const zapIconRef = useRef<ZapIconHandle>(null);
+  const gaugeIconRef = useRef<GaugeIconHandle>(null);
   const fileTextIconRef = useRef<FileTextIconHandle>(null);
   const layersIconRef = useRef<LayersIconHandle>(null);
 
@@ -169,6 +172,25 @@ export function AppSidebar({ templates, sidebarOpen, onToggle, collapsed, onColl
                   {!collapsed && <span>Race</span>}
                 </button>
               </>
+            );
+          })()}
+          {(() => {
+            const benchActive = currentPath === '/benchmarks';
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  navigate('/benchmarks');
+                  if (sidebarOpen) onToggle();
+                }}
+                onMouseEnter={() => gaugeIconRef.current?.startAnimation()}
+                onMouseLeave={() => gaugeIconRef.current?.stopAnimation()}
+                className={`sidebar-nav-item ${benchActive ? 'active' : ''} ${collapsed ? 'justify-center px-0' : ''}`}
+                title={collapsed ? 'Benchmarks' : undefined}
+              >
+                <GaugeIcon ref={gaugeIconRef} size={16} className={benchActive ? 'text-lime' : ''} />
+                {!collapsed && <span>Benchmarks</span>}
+              </button>
             );
           })()}
 
