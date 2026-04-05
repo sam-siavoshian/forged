@@ -116,6 +116,7 @@ class RocketResult:
     step_timings: list[float] = field(default_factory=list)
     skipped_steps: list[int] = field(default_factory=list)
     step_outcomes: list[tuple[str, str | None]] = field(default_factory=list)
+    page_content: str | None = None  # visible text extracted via page.evaluate() before disconnect
     # step_outcomes entries: ("completed", None), ("skipped", reason), ("aborted", reason),
     # ("completed_after_retry", None), ("fallback_failed", reason)
 

@@ -201,6 +201,28 @@ async def _create_browser(session_id: str):
     return mgr, browser, browser.cdp_url
 
 
+async def _create_browser_silent():
+    """Create a BaaS cloud browser WITHOUT recording UI steps.
+
+    Used for speculative pre-creation where browser spins up in parallel
+    with template search. The caller flushes timing into the session
+    timeline after awaiting, preserving step ordering.
+
+    Returns (manager, browser_session, cdp_url, creation_ms).
+    """
+    from src.browser.cloud import CloudBrowserManager
+
+    api_key = os.environ.get("BROWSER_USE_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("BROWSER_USE_API_KEY not set")
+
+    t0 = time.monotonic()
+    mgr = CloudBrowserManager(api_key)
+    browser = await mgr.create()
+    creation_ms = (time.monotonic() - t0) * 1000
+    return mgr, browser, browser.cdp_url, creation_ms
+
+
 # ---------------------------------------------------------------------------
 # Shared: run browser-use agent
 # ---------------------------------------------------------------------------
@@ -273,6 +295,33 @@ async def _run_agent(
         return history, bu_session
     finally:
         await release_browser_session(bu_session)
+
+
+async def _extract_answer_from_page(task: str, page_text: str) -> str:
+    """Use Claude Haiku to extract the answer from raw page text.
+
+    This replaces the full browser-use agent loop (~35s) with a single
+    fast LLM call (~1-2s) when Playwright has already navigated to the
+    right page and all steps are complete.
+    """
+    from anthropic import AsyncAnthropic
+
+    client = AsyncAnthropic()
+    response = await client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1024,
+        messages=[{
+            "role": "user",
+            "content": (
+                f"Task: {task}\n\n"
+                f"Page content (visible text from the browser):\n"
+                f"{page_text[:8000]}\n\n"
+                f"Extract the answer to the task from the page content above. "
+                f"Be concise and direct. Return only the requested information."
+            ),
+        }],
+    )
+    return response.content[0].text
 
 
 def _extract_and_store_result(session_id: str, history) -> None:
@@ -405,12 +454,31 @@ async def _run_baseline(session_id: str, task: str) -> None:
         elapsed = time.monotonic() * 1000 - start_ms
         _update(session_id, status="complete", phase="complete", duration_ms=elapsed, current_step="Done")
 
+        # Persist trace
+        try:
+            from src.db.traces import record_execution_trace
+            await record_execution_trace(
+                template_id=None,
+                task_description=task,
+                mode="baseline",
+                steps_executed=[s.model_dump() for s in sessions[session_id].steps],
+                total_duration_ms=int(elapsed),
+                success=True,
+            )
+        except Exception:
+            logger.warning("Failed to record baseline trace (non-fatal)")
+
     except Exception as e:
         elapsed = time.monotonic() * 1000 - start_ms
         logger.exception("Baseline failed: %s", e)
         _update(session_id, status="error", phase="error", duration_ms=elapsed, error=str(e), current_step=f"Error: {e}")
 
     finally:
+        if bu_session:
+            try:
+                await bu_session.close()
+            except Exception:
+                pass
         if mgr and browser:
             try:
                 await mgr.stop(browser.browser_id)
@@ -428,6 +496,7 @@ async def _run_rocket(session_id: str, task: str) -> None:
     start_ms = time.monotonic() * 1000
     mgr = browser = None
     bu_session = None
+    browser_task: asyncio.Task | None = None
 
     try:
         _update(session_id, status="running", phase="rocket")
@@ -446,6 +515,11 @@ async def _run_rocket(session_id: str, task: str) -> None:
         band_label = f"{match.confidence_band} confidence" if match.needs_verification else ""
         _step(session_id, f"Template matched! {match.similarity:.0%} similarity to '{match.task_pattern}' {band_label}".strip(), "playwright")
 
+        # Start browser creation in parallel with parameter extraction.
+        # Browser boot takes 2-4s; param extraction takes 1-2s. Overlapping
+        # them saves 1-3s on every forge run.
+        browser_task = asyncio.create_task(_create_browser(session_id))
+
         _step(session_id, "Extracting parameters from task...", "playwright")
 
         from src.template.extractor import extract_parameters
@@ -459,7 +533,8 @@ async def _run_rocket(session_id: str, task: str) -> None:
         filled_steps = _fill_parameters(match.steps, params, match.handoff_index)
         _step(session_id, f"Prepared {len(filled_steps)} Playwright steps", "playwright")
 
-        mgr, browser, cdp_url = await _create_browser(session_id)
+        # Await browser (likely already done by now)
+        mgr, browser, cdp_url = await browser_task
 
         _step(session_id, "Running forged path...", "playwright")
 
@@ -488,12 +563,40 @@ async def _run_rocket(session_id: str, task: str) -> None:
         elapsed = time.monotonic() * 1000 - start_ms
         _update(session_id, status="complete", phase="complete", duration_ms=elapsed, current_step="Done")
 
+        # Persist trace
+        try:
+            from src.db.traces import record_execution_trace
+            await record_execution_trace(
+                template_id=match.template_id if match else None,
+                task_description=task,
+                mode="rocket",
+                steps_executed=[s.model_dump() for s in sessions[session_id].steps],
+                total_duration_ms=int(elapsed),
+                success=True,
+                rocket_steps_count=rocket_result.steps_completed if rocket_result else 0,
+                rocket_duration_ms=int(rocket_result.duration_seconds * 1000) if rocket_result else None,
+            )
+        except Exception:
+            logger.warning("Failed to record rocket trace (non-fatal)")
+
     except Exception as e:
         elapsed = time.monotonic() * 1000 - start_ms
         logger.exception("Forge failed: %s", e)
         _update(session_id, status="error", phase="error", duration_ms=elapsed, error=str(e), current_step=f"Error: {e}")
 
     finally:
+        # If browser_task was created but never awaited (error before await),
+        # await it now so we can clean up the browser we started.
+        if browser_task and not browser_task.done():
+            try:
+                mgr, browser, cdp_url = await browser_task
+            except Exception:
+                pass
+        if bu_session:
+            try:
+                await bu_session.close()
+            except Exception:
+                pass
         if mgr and browser:
             try:
                 await mgr.stop(browser.browser_id)
@@ -510,9 +613,17 @@ async def _run_chat(session_id: str, task: str) -> None:
     """Auto-mode: search for template, use rocket if found, baseline+learn if not."""
     start_ms = time.monotonic() * 1000
     mgr = browser = bu_session = None
+    browser_future: asyncio.Task | None = None
 
     try:
         _update(session_id, status="running", phase="rocket", task=task)
+
+        # Speculative browser pre-creation: launch browser in parallel with
+        # template search. The browser is needed in BOTH paths (rocket and
+        # baseline), so there is zero waste. Uses _create_browser_silent()
+        # to avoid interleaving UI steps with template search progress.
+        browser_future = asyncio.create_task(_create_browser_silent())
+
         _step(session_id, "Searching for matching template...", "playwright", action_type="template_match")
 
         from src.matching.matcher import find_matching_template
@@ -571,7 +682,13 @@ async def _run_chat(session_id: str, task: str) -> None:
             effective_handoff = len(filtered_steps) - 1 if filtered_steps else 0
 
             filled_steps = _fill_parameters(filtered_steps, params, effective_handoff)
-            mgr, browser, cdp_url = await _create_browser(session_id)
+
+            # Await speculative browser (likely already done by now — started
+            # before template search, and search + params + filter take ~2s)
+            mgr, browser, cdp_url, browser_creation_ms = await browser_future
+            browser_future = None  # Mark as consumed
+            _update(session_id, live_url=browser.live_url)
+            _step(session_id, f"Browser ready ({browser_creation_ms:.0f}ms, pre-created)", "agent", browser_creation_ms)
 
             _step(session_id, "Running forged path...", "playwright", action_type="agent_action")
             from src.browser.rocket import PlaywrightRocket
@@ -597,12 +714,31 @@ async def _run_chat(session_id: str, task: str) -> None:
             # Build step summary for smarter agent handoff
             step_summary = _build_step_summary(filled_steps, rocket_result)
 
-            _update(session_id, phase="agent")
-            _step(session_id, "Handing off to agent...", "agent", action_type="agent_action")
-            history, bu_session = await _run_agent(session_id, task, cdp_url, rocket_result, step_summary=step_summary)
-
-            # Extract agent's final answer
-            _extract_and_store_result(session_id, history)
+            # FAST PATH: if all steps completed and page content captured,
+            # skip the full agent (~35s) and use Haiku extraction (~1-2s)
+            if (not rocket_result.aborted
+                    and rocket_result.page_content
+                    and rocket_result.steps_completed >= len(filled_steps)):
+                _step(session_id, "All steps complete. Extracting answer directly...",
+                      "playwright", action_type="extract")
+                try:
+                    answer = await _extract_answer_from_page(task, rocket_result.page_content)
+                    _update(session_id, result=answer, agent_complete=True,
+                            agent_duration_ms=(time.monotonic() * 1000 - start_ms))
+                    _step(session_id, "Answer extracted (no agent needed)",
+                          "playwright", action_type="done")
+                except Exception as extract_err:
+                    logger.warning("Fast extraction failed, falling back to agent: %s", extract_err)
+                    _update(session_id, phase="agent")
+                    _step(session_id, "Handing off to agent...", "agent", action_type="agent_action")
+                    history, bu_session = await _run_agent(session_id, task, cdp_url, rocket_result, step_summary=step_summary)
+                    _extract_and_store_result(session_id, history)
+            else:
+                # SLOW PATH: partial completion or no page content — full agent
+                _update(session_id, phase="agent")
+                _step(session_id, "Handing off to agent...", "agent", action_type="agent_action")
+                history, bu_session = await _run_agent(session_id, task, cdp_url, rocket_result, step_summary=step_summary)
+                _extract_and_store_result(session_id, history)
 
         else:
             # --- BASELINE + LEARN PATH ---
@@ -610,7 +746,11 @@ async def _run_chat(session_id: str, task: str) -> None:
             _step(session_id, "No template found. Running full agent and learning...",
                   "agent", action_type="template_match", details={"mode": "baseline_learn"})
 
-            mgr, browser, cdp_url = await _create_browser(session_id)
+            # Await speculative browser (started before template search)
+            mgr, browser, cdp_url, browser_creation_ms = await browser_future
+            browser_future = None  # Mark as consumed
+            _update(session_id, live_url=browser.live_url)
+            _step(session_id, f"Browser ready ({browser_creation_ms:.0f}ms, pre-created)", "agent", browser_creation_ms)
             history, bu_session = await _run_agent(session_id, task, cdp_url)
 
             # Extract agent's final answer
@@ -639,6 +779,25 @@ async def _run_chat(session_id: str, task: str) -> None:
         _update(session_id, status="error", phase="error", duration_ms=elapsed, error=str(e), current_step=f"Error: {e}")
 
     finally:
+        # Clean up speculative browser if it was never consumed
+        if browser_future is not None and not browser_future.done():
+            browser_future.cancel()
+            try:
+                await browser_future
+            except (asyncio.CancelledError, Exception):
+                pass
+        elif browser_future is not None and browser_future.done():
+            # Browser was created but never awaited (error before consumption)
+            try:
+                _mgr, _browser, _cdp, _ms = browser_future.result()
+                await _mgr.stop(_browser.browser_id)
+            except Exception:
+                pass
+        if bu_session:
+            try:
+                await bu_session.close()
+            except Exception:
+                pass
         if mgr and browser:
             try:
                 await mgr.stop(browser.browser_id)
@@ -779,6 +938,50 @@ async def get_status(session_id: str) -> SessionStatus:
             duration_ms=0,
         )
     return s
+
+
+@app.get("/api/race-history")
+async def race_history() -> list[dict]:
+    """Return recent race results (baseline + forge pairs) from execution_traces."""
+    try:
+        from supabase import create_client
+        client = create_client(
+            os.environ.get("SUPABASE_URL", ""),
+            os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""),
+        )
+        result = client.table("execution_traces").select(
+            "id, task_description, mode, total_duration_ms, rocket_duration_ms, rocket_steps_count, success, created_at"
+        ).order("created_at", desc=True).limit(40).execute()
+
+        # Group by task_description — pair baseline + rocket runs
+        from collections import defaultdict
+        groups: dict[str, dict] = defaultdict(lambda: {"baseline": None, "rocket": None})
+        for row in result.data:
+            task = row["task_description"]
+            mode = row["mode"]
+            if groups[task][mode] is None:
+                groups[task][mode] = row
+
+        pairs = []
+        for task, g in groups.items():
+            if g["baseline"] and g["rocket"]:
+                b_ms = g["baseline"]["total_duration_ms"]
+                r_ms = g["rocket"]["total_duration_ms"]
+                speedup = round(b_ms / r_ms, 2) if r_ms > 0 else 0
+                pairs.append({
+                    "task": task,
+                    "baseline_duration_ms": b_ms,
+                    "rocket_duration_ms": r_ms,
+                    "speedup": speedup,
+                    "rocket_steps": g["rocket"].get("rocket_steps_count"),
+                    "created_at": g["rocket"].get("created_at", g["baseline"].get("created_at", "")),
+                })
+
+        pairs.sort(key=lambda x: x["created_at"], reverse=True)
+        return pairs[:20]
+    except Exception as e:
+        logger.warning("Failed to fetch race history: %s", e)
+        return []
 
 
 @app.get("/api/templates")

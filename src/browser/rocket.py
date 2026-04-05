@@ -297,6 +297,17 @@ class PlaywrightRocket:
                     )
 
             current_url = page.url
+
+            # Extract visible page text before disconnecting.
+            # This enables skipping the full agent when all steps completed.
+            page_text = None
+            try:
+                page_text = await page.evaluate("() => document.body.innerText")
+                if page_text:
+                    page_text = page_text[:15000]  # cap at 15k chars
+            except Exception as e:
+                logger.warning("Page text extraction failed (non-fatal): %s", e)
+
             return RocketResult(
                 steps_completed=completed,
                 total_steps=len(template_steps),
@@ -306,6 +317,7 @@ class PlaywrightRocket:
                 step_timings=step_timings,
                 skipped_steps=skipped_steps,
                 step_outcomes=step_outcomes,
+                page_content=page_text,
             )
 
         finally:
