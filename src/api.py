@@ -557,6 +557,9 @@ async def _run_baseline(session_id: str, task: str) -> None:
         mgr, browser, cdp_url = await _create_browser(session_id)
         _history, bu_session = await _run_agent(session_id, task, cdp_url)
 
+        # Extract and store the agent's final answer
+        _extract_and_store_result(session_id, _history)
+
         elapsed = time.monotonic() * 1000 - start_ms
         _update(session_id, status="complete", phase="complete", duration_ms=elapsed, current_step="Done")
 
