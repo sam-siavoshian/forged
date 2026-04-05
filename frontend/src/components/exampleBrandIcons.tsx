@@ -1,5 +1,5 @@
 import { FaBowlFood, FaHackerNews } from 'react-icons/fa6';
-import { SiImdb, SiWikipedia } from 'react-icons/si';
+import { SiGithub, SiWikipedia } from 'react-icons/si';
 
 const ICON = 'size-5 shrink-0';
 
@@ -28,9 +28,9 @@ export function ExampleBrandIcon({ id }: { id: string }) {
       return <SiWikipedia className={`${ICON} text-white/90`} aria-hidden />;
     case 'hn-story':
       return <FaHackerNews className={`${ICON} text-[#FF6600]`} aria-hidden />;
-    case 'imdb-search':
-    case 'imdb-title':
-      return <SiImdb className={`${ICON} text-[#F5C518]`} aria-hidden />;
+    case 'github-trending':
+    case 'github-repo':
+      return <SiGithub className={`${ICON} text-white/90`} aria-hidden />;
     case 'recipe-lookup':
     case 'recipe-details':
       return <FaBowlFood className={`${ICON} text-amber-400/90`} aria-hidden />;

@@ -18,10 +18,10 @@ export const EXAMPLE_TASKS: ExampleTask[] = [
       'Go to news.ycombinator.com, click on the top story on the front page, then extract the title, the URL it links to, and the top 3 comments.',
   },
   {
-    id: 'imdb-search',
-    label: 'IMDb title lookup',
+    id: 'github-trending',
+    label: 'Check GitHub trending',
     task:
-      'Go to imdb.com, search for "Inception", open the first title in the results, then report the release year, IMDb rating, and runtime.',
+      'Go to github.com/trending, find the #1 trending repository, and report its name, star count, and description.',
   },
   {
     id: 'recipe-lookup',
