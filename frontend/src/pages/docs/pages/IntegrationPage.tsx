@@ -4,68 +4,58 @@ const SETUP_CMD = `curl -fsSL https://raw.githubusercontent.com/sam-siavoshian/b
 
 export function IntegrationPage() {
   return (
-    <DocPageShell kicker="Quick Start" title="Set up Forged in 60 seconds">
-      <DocSection title="One-command install" delay={40}>
-        <p className="text-[14px] text-text-dim leading-relaxed mb-3">
-          Run this in your terminal. The wizard detects your Python, finds the repo, installs dependencies, and registers Forged with Claude Code automatically.
+    <DocPageShell kicker="Quick Start" title="Install in one command">
+      <DocSection title="Install" delay={40}>
+        <p className="text-[14px] text-text-dim leading-relaxed mb-4">
+          The setup wizard finds your Python, installs dependencies, and registers
+          Forged with Claude Code. Takes about 60 seconds.
         </p>
-        <pre className="saas-inset-sm rounded-xl p-4 font-mono text-[11px] text-text-dim overflow-x-auto border border-border leading-relaxed whitespace-pre-wrap break-all">
-          {SETUP_CMD}
-        </pre>
-        <p className="mt-3 text-[12px] text-text-muted leading-relaxed">
-          Requires <strong className="text-text-dim">Python 3.11+</strong> and the{' '}
-          <strong className="text-text-dim">Claude Code CLI</strong>. The script uses{' '}
-          <code className="font-mono text-[11px] text-sky/90">claude mcp add</code> under the hood.
-        </p>
+        <div className="border border-lime/20 rounded-xl overflow-hidden">
+          <div className="px-4 py-2.5 bg-lime/[0.04] border-b border-lime/10 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-lime/60" />
+            <span className="text-[11px] text-lime/80 font-medium font-mono">Terminal</span>
+          </div>
+          <pre className="p-4 font-mono text-[12px] text-text leading-relaxed overflow-x-auto whitespace-pre-wrap break-all bg-black/20">
+            {SETUP_CMD}
+          </pre>
+        </div>
+        <div className="flex gap-4 mt-4">
+          <div className="flex items-center gap-2 text-[12px] text-text-muted">
+            <span className="w-1.5 h-1.5 rounded-full bg-text-muted/40" />
+            Python 3.11+
+          </div>
+          <div className="flex items-center gap-2 text-[12px] text-text-muted">
+            <span className="w-1.5 h-1.5 rounded-full bg-text-muted/40" />
+            Claude Code CLI
+          </div>
+        </div>
       </DocSection>
 
-      <DocSection title="Manual setup" delay={80}>
-        <p className="text-[14px] text-text-dim leading-relaxed mb-3">
-          If you prefer to configure manually, add this to your Claude Code MCP settings:
+      <DocSection title="Try it" delay={80}>
+        <p className="text-[14px] text-text-dim leading-relaxed mb-4">
+          Open Claude Code and try these. Each task gets faster on repeat:
         </p>
-        <pre className="saas-inset-sm rounded-xl p-4 font-mono text-[11px] text-text-dim overflow-x-auto border border-border leading-relaxed">
-{`claude mcp add -s user \\
-  -e FORGED_API_URL=http://localhost:8000 \\
-  forged -- python /path/to/mcp_server.py`}
-        </pre>
-      </DocSection>
-
-      <DocSection title="Start the backend" delay={120}>
-        <p className="text-[14px] text-text-dim leading-relaxed mb-3">
-          Forged's MCP server talks to the FastAPI backend. Start it before using any tools:
-        </p>
-        <pre className="saas-inset-sm rounded-xl p-4 font-mono text-[11px] text-text-dim overflow-x-auto border border-border leading-relaxed">
-{`cd /path/to/forged && ./dev.sh`}
-        </pre>
-        <p className="mt-3 text-[12px] text-text-muted leading-relaxed">
-          This starts both the Python backend (port 8000) and the React frontend (port 5173).
-        </p>
-      </DocSection>
-
-      <DocSection title="Try it" delay={160}>
-        <p className="text-[14px] text-text-dim leading-relaxed mb-3">
-          Open Claude Code and ask it to run a browser task. Forged handles everything:
-        </p>
-        <ul className="space-y-2 text-[14px] text-text-dim leading-relaxed list-none pl-0">
-          <li className="flex gap-3">
-            <span className="font-mono text-lime/80 text-[12px] shrink-0 pt-0.5">1.</span>
-            <span>
-              <em className="text-text">"Go to news.ycombinator.com and get the top story"</em> — first run, full agent, learns a template.
-            </span>
-          </li>
-          <li className="flex gap-3">
-            <span className="font-mono text-lime/80 text-[12px] shrink-0 pt-0.5">2.</span>
-            <span>
-              Run the same task again — Forged replays learned steps via Playwright. Visibly faster.
-            </span>
-          </li>
-          <li className="flex gap-3">
-            <span className="font-mono text-lime/80 text-[12px] shrink-0 pt-0.5">3.</span>
-            <span>
-              Ask <em className="text-text">"What skills has Forged learned?"</em> — Claude calls <code className="font-mono text-[12px] text-sky/90">list_learned_skills</code>.
-            </span>
-          </li>
-        </ul>
+        <div className="space-y-3">
+          {[
+            { task: 'Go to news.ycombinator.com and get the top story', note: 'News extraction' },
+            { task: 'Search for mechanical keyboards on Amazon', note: 'E-commerce search' },
+            { task: 'Go to github.com/trending and get the #1 repo', note: 'Data scraping' },
+          ].map(({ task, note }) => (
+            <div key={task} className="flex gap-3 items-start">
+              <span className="text-[11px] text-text-muted font-mono shrink-0 pt-1 w-24">{note}</span>
+              <div className="flex-1 border border-border rounded-lg px-3 py-2 bg-surface/30">
+                <p className="text-[13px] text-text italic leading-relaxed">"{task}"</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 p-4 rounded-xl bg-lime/[0.04] border border-lime/10">
+          <p className="text-[13px] text-text-dim leading-relaxed">
+            <strong className="text-lime font-medium">Pro tip:</strong> Run the same task twice. The second run
+            skips learned steps entirely — no LLM calls for navigation, login, or search. Just Playwright at
+            millisecond speed.
+          </p>
+        </div>
       </DocSection>
     </DocPageShell>
   );

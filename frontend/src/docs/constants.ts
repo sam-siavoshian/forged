@@ -4,7 +4,7 @@ export const DOCS_NAV = [
   { slug: 'integration', label: 'Quick Start', path: '/docs/integration' },
   { slug: 'endpoints', label: 'MCP Tools & API', path: '/docs/endpoints' },
   { slug: 'models', label: 'Response Types', path: '/docs/models' },
-  { slug: 'environment', label: 'Configuration', path: '/docs/environment' },
+  { slug: 'environment', label: 'How It Works', path: '/docs/environment' },
 ] as const;
 
 export type DocSlug = (typeof DOCS_NAV)[number]['slug'];
