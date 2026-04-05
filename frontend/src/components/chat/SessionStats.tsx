@@ -9,30 +9,30 @@ export function SessionStats({ elapsedMs, stepCount, modeUsed, isComplete }: Ses
   const seconds = (elapsedMs / 1000).toFixed(1);
 
   return (
-    <div className="flex items-center justify-between px-5 py-2.5 border-t border-border bg-surface/50">
-      <div className="flex items-center gap-5 text-[12px] text-text-dim">
-        <span className="font-mono">{seconds}s</span>
-        <span>{stepCount} steps</span>
+    <div
+      className="flex items-center justify-between px-5 h-10 shrink-0"
+      style={{
+        borderTop: '1px solid var(--color-border)',
+        background: 'rgba(0,0,0,0.2)',
+        boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.3)',
+      }}
+    >
+      <div className="flex items-center gap-6 text-[11px] font-mono text-text-muted">
+        <span>{seconds}s</span>
+        <span>{stepCount} step{stepCount !== 1 ? 's' : ''}</span>
       </div>
 
       {modeUsed && (
-        <div className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-lg
-          ${modeUsed === 'rocket' ? 'bg-lime/10 text-lime' : 'bg-amber/10 text-amber'}`}>
-          {modeUsed === 'rocket' ? (
-            <>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8" />
-              </svg>
-              Rocket
-            </>
-          ) : (
-            <>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 6v4l3 3" />
-              </svg>
-              {isComplete ? 'Learned' : 'Learning'}
-            </>
-          )}
+        <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider">
+          <div
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              background: modeUsed === 'rocket' ? 'var(--color-lime)' : 'var(--color-amber)',
+            }}
+          />
+          <span style={{ color: modeUsed === 'rocket' ? 'var(--color-lime)' : 'var(--color-amber)' }}>
+            {modeUsed === 'rocket' ? 'rocket' : isComplete ? 'learned' : 'learning'}
+          </span>
         </div>
       )}
     </div>

@@ -8,6 +8,7 @@ interface ChatInputProps {
 
 export function ChatInput({ onSubmit, disabled, placeholder }: ChatInputProps) {
   const [value, setValue] = useState('');
+  const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = useCallback(() => {
@@ -34,33 +35,69 @@ export function ChatInput({ onSubmit, disabled, placeholder }: ChatInputProps) {
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }, []);
 
+  const canSubmit = value.trim().length > 0 && !disabled;
+
   return (
-    <div className="w-full max-w-[720px]">
-      <div className="saas-inset relative flex items-end gap-3 rounded-2xl p-3">
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => { setValue(e.target.value); handleInput(); }}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder || 'Describe a browser task...'}
-          disabled={disabled}
-          rows={1}
-          className="flex-1 resize-none bg-transparent text-[14px] text-text placeholder-text-muted
-                     focus:outline-none disabled:opacity-30 leading-relaxed py-1.5 px-1
-                     min-h-[36px] max-h-[120px]"
-        />
-        <button
-          onClick={handleSubmit}
-          disabled={disabled || !value.trim()}
-          className="saas-btn-primary flex items-center gap-2 px-5 py-2 rounded-xl text-[13px]
-                     font-medium whitespace-nowrap disabled:opacity-30 disabled:cursor-not-allowed
-                     transition-all shrink-0"
+    <div className="w-full max-w-[680px]">
+      {/* Outer glow ring on focus */}
+      <div
+        className="rounded-[20px] p-[1px] transition-all duration-300"
+        style={{
+          background: focused
+            ? 'linear-gradient(135deg, rgba(200,255,0,0.15), rgba(200,255,0,0.03), rgba(200,255,0,0.08))'
+            : 'rgba(255,255,255,0.04)',
+          boxShadow: focused
+            ? '0 0 30px rgba(200,255,0,0.06), 0 0 60px rgba(200,255,0,0.02)'
+            : 'none',
+        }}
+      >
+        <div
+          className="relative flex items-end gap-3 rounded-[19px] px-5 py-4"
+          style={{
+            background: 'rgba(0,0,0,0.4)',
+            boxShadow: `
+              inset 0 8px 24px rgba(0,0,0,0.6),
+              inset 0 2px 6px rgba(0,0,0,0.4),
+              inset 0 -1px 3px rgba(255,255,255,0.02),
+              0 1px 0 rgba(255,255,255,0.03)
+            `,
+          }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 2L11 13" /><path d="M22 2L15 22L11 13L2 9L22 2Z" />
-          </svg>
-          Run task
-        </button>
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => { setValue(e.target.value); handleInput(); }}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={placeholder || 'Send a message...'}
+            disabled={disabled}
+            rows={1}
+            className="flex-1 resize-none bg-transparent text-[15px] text-text placeholder-text-muted/60
+                       focus:outline-none disabled:opacity-30 leading-[1.6] py-0.5 px-0
+                       min-h-[28px] max-h-[120px]"
+            style={{ fontFamily: 'var(--font-body)' }}
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className="shrink-0 flex items-center justify-center w-9 h-9 rounded-xl
+                       transition-all duration-200"
+            style={{
+              background: canSubmit ? 'var(--color-lime)' : 'rgba(255,255,255,0.04)',
+              color: canSubmit ? '#09090b' : 'var(--color-text-muted)',
+              boxShadow: canSubmit
+                ? 'inset 0 -3px 8px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.25), 0 2px 12px rgba(200,255,0,0.2)'
+                : 'inset 0 4px 8px rgba(0,0,0,0.3)',
+              opacity: canSubmit ? 1 : 0.4,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );

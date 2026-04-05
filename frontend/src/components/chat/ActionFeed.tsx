@@ -14,36 +14,45 @@ export function ActionFeed({ steps, isRunning }: ActionFeedProps) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [steps.length]);
 
-  if (steps.length === 0 && !isRunning) return null;
-
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
-        {/* Timeline connector */}
-        <div className="relative">
-          {/* Vertical line */}
-          <div className="absolute left-[26px] top-4 bottom-4 w-px bg-border-subtle" />
-
-          {/* Cards */}
-          <div className="relative space-y-1">
-            {steps.map((step, i) => (
-              <ActionCard
-                key={step.id}
-                step={step}
-                isLast={i === steps.length - 1}
-                isRunning={isRunning}
-              />
-            ))}
+      <div className="flex-1 overflow-y-auto py-3">
+        {steps.length === 0 && isRunning && (
+          <div className="flex items-center gap-3 px-6 py-4"
+               style={{ animation: 'fade-in 0.3s ease both' }}>
+            <div className="w-2 h-2 rounded-full bg-sky dot-pulse" />
+            <span className="text-[12px] text-text-muted">Starting agent...</span>
           </div>
+        )}
+
+        {/* Timeline */}
+        <div className="relative">
+          {/* Vertical connector line */}
+          {steps.length > 1 && (
+            <div
+              className="absolute left-[26px] top-6 bottom-6 w-px"
+              style={{ background: 'linear-gradient(to bottom, var(--color-border), transparent)' }}
+            />
+          )}
+
+          {steps.map((step, i) => (
+            <ActionCard
+              key={step.id}
+              step={step}
+              isLast={i === steps.length - 1}
+              isRunning={isRunning}
+            />
+          ))}
         </div>
 
-        {/* Running indicator */}
-        {isRunning && (
-          <div className="flex items-center gap-3 px-4 py-3">
-            <div className="shrink-0">
-              <div className="w-2 h-2 rounded-full bg-sky animate-pulse" />
+        {/* Thinking indicator */}
+        {isRunning && steps.length > 0 && (
+          <div className="flex items-center gap-3 px-6 py-3 ml-[6px]">
+            <div className="flex gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-text-muted thinking-dot" />
+              <div className="w-1.5 h-1.5 rounded-full bg-text-muted thinking-dot thinking-dot-2" />
+              <div className="w-1.5 h-1.5 rounded-full bg-text-muted thinking-dot thinking-dot-3" />
             </div>
-            <span className="text-[12px] text-text-muted">Thinking...</span>
           </div>
         )}
 

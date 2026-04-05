@@ -17,14 +17,12 @@ export function ChatPage() {
   const { status } = usePoller(sessionId);
   const timer = useTimer();
 
-  // Sync URL param to state
   useEffect(() => {
     if (urlSessionId && urlSessionId !== sessionId) {
       setSessionId(urlSessionId);
     }
   }, [urlSessionId]);
 
-  // Stop timer on completion
   useEffect(() => {
     if (status?.status === 'complete' || status?.status === 'error') {
       timer.stop();
@@ -49,61 +47,116 @@ export function ChatPage() {
   const liveUrl = status?.live_url || null;
   const modeUsed = (status as any)?.mode_used || null;
 
-  // IDLE STATE — no active session
+  // ═══ IDLE STATE ═══
   if (!sessionId) {
     return (
-      <div className="flex flex-col items-center justify-center h-full px-6">
-        <div className="flex flex-col items-center gap-8 max-w-[720px] w-full"
-             style={{ animation: 'fade-up 0.55s ease both' }}>
-          {/* Hero */}
-          <h1 className="font-serif italic text-[42px] leading-tight text-center text-text tracking-tight">
-            What should I do?
-          </h1>
-          <p className="text-[14px] text-text-dim text-center max-w-[480px] -mt-2">
-            Describe a browser task. If I've seen it before, I'll be fast.
-          </p>
+      <div className="flex flex-col items-center justify-center h-full px-6 relative">
+        {/* Subtle radial glow behind the heading */}
+        <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-[500px] h-[400px] pointer-events-none"
+             style={{ background: 'radial-gradient(ellipse, rgba(200,255,0,0.025) 0%, transparent 70%)' }} />
+
+        <div className="flex flex-col items-center gap-6 max-w-[680px] w-full relative z-10">
+          {/* Heading */}
+          <div className="text-center" style={{ animation: 'fade-up 0.5s cubic-bezier(0.16,1,0.3,1) both' }}>
+            <h1
+              className="text-[48px] sm:text-[56px] leading-[1.05] tracking-[-0.03em] text-text"
+              style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}
+            >
+              What should I do?
+            </h1>
+            <p className="text-[14px] text-text-dim mt-4 max-w-[440px] mx-auto leading-[1.7]">
+              Describe a browser task. If I've seen it before, I'll be fast.
+            </p>
+          </div>
 
           {/* Input */}
-          <ChatInput onSubmit={handleSubmit} />
+          <div className="w-full" style={{ animation: 'fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 80ms both' }}>
+            <ChatInput onSubmit={handleSubmit} />
+          </div>
 
           {/* Example chips */}
-          <div className="flex flex-wrap justify-center gap-2 -mt-2">
+          <div className="flex flex-wrap justify-center gap-2"
+               style={{ animation: 'fade-up 0.5s cubic-bezier(0.16,1,0.3,1) 160ms both' }}>
             {EXAMPLE_TASKS.map((ex) => (
               <button
                 key={ex.id}
                 onClick={() => handleSubmit(ex.task)}
-                className="px-3 py-1.5 rounded-lg text-[12px] text-text-dim
-                           border border-border hover:border-text-muted hover:text-text
-                           transition-all bg-transparent"
+                className="group px-3.5 py-2 rounded-xl text-[12px] text-text-dim
+                           transition-all duration-200 cursor-pointer"
+                style={{
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.2), 0 1px 0 rgba(255,255,255,0.02)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(200,255,0,0.04)';
+                  e.currentTarget.style.borderColor = 'rgba(200,255,0,0.15)';
+                  e.currentTarget.style.color = 'var(--color-text)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                  e.currentTarget.style.color = '';
+                }}
               >
                 {ex.label}
               </button>
             ))}
           </div>
+
+          {/* Keyboard hint */}
+          <p className="text-[11px] text-text-muted/40 mt-2"
+             style={{ animation: 'fade-in 0.4s ease 300ms both' }}>
+            Press <kbd className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-[10px] font-mono">Enter</kbd> to run
+          </p>
         </div>
       </div>
     );
   }
 
-  // SESSION STATE — active session
+  // ═══ SESSION STATE ═══
   return (
     <div className="flex flex-col h-full">
-      {/* Main content: split panel */}
       <div className="flex-1 flex min-h-0">
         {/* Left: Action feed */}
-        <div className="w-[380px] shrink-0 border-r border-border flex flex-col bg-surface/30">
-          <div className="px-4 py-3 border-b border-border-subtle">
-            <p className="text-[12px] text-text-muted truncate">
+        <div
+          className="w-[400px] shrink-0 flex flex-col"
+          style={{
+            background: 'rgba(0,0,0,0.15)',
+            borderRight: '1px solid var(--color-border)',
+          }}
+        >
+          {/* Task header */}
+          <div className="px-5 py-3.5 border-b border-border-subtle flex items-center gap-3">
+            {isRunning && (
+              <div className="w-2 h-2 rounded-full bg-lime dot-pulse shrink-0" />
+            )}
+            {!isRunning && status?.status === 'complete' && (
+              <div className="w-2 h-2 rounded-full bg-lime shrink-0" />
+            )}
+            {!isRunning && status?.status === 'error' && (
+              <div className="w-2 h-2 rounded-full bg-amber shrink-0" />
+            )}
+            <p className="text-[13px] text-text truncate flex-1">
               {status?.task || 'Running task...'}
             </p>
+            {modeUsed && (
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md shrink-0 ${
+                modeUsed === 'rocket' ? 'bg-lime/10 text-lime' : 'bg-amber/10 text-amber'
+              }`}>
+                {modeUsed === 'rocket' ? 'ROCKET' : 'LEARNING'}
+              </span>
+            )}
           </div>
+
+          {/* Feed */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ActionFeed steps={steps} isRunning={isRunning} />
           </div>
         </div>
 
         {/* Right: Browser embed */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 bg-bg">
           <div className="flex-1 p-3">
             <BrowserEmbed liveUrl={liveUrl} phase={phase} />
           </div>
