@@ -221,4 +221,4 @@ MIT
 
 ---
 
-Made with speed of ⚡ and ❤️ at Diamond Hack UCSD 2026 by Sam Siavoshian
+Made at the speed of ⚡ and with ❤️ at Diamond Hack UCSD '26 by Saam Siavoshian
