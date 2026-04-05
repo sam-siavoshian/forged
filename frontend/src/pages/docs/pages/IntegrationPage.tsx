@@ -1,59 +1,71 @@
 import { DocPageShell, DocSection } from '../DocPageShell';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api';
+const SETUP_CMD = `curl -fsSL https://raw.githubusercontent.com/sam-siavoshian/browser-use-rl-env/main/setup_mcp.sh | bash`;
 
 export function IntegrationPage() {
   return (
-    <DocPageShell kicker="Integration" title="Base URL, polling, and requests">
-      <DocSection title="Base URL" delay={40}>
-        <div className="saas-inset-sm rounded-xl px-4 py-3 font-mono text-[13px] text-text-dim break-all border border-border">
-          {API_BASE}
-        </div>
+    <DocPageShell kicker="Quick Start" title="Set up Forged in 60 seconds">
+      <DocSection title="One-command install" delay={40}>
+        <p className="text-[14px] text-text-dim leading-relaxed mb-3">
+          Run this in your terminal. The wizard detects your Python, finds the repo, installs dependencies, and registers Forged with Claude Code automatically.
+        </p>
+        <pre className="saas-inset-sm rounded-xl p-4 font-mono text-[11px] text-text-dim overflow-x-auto border border-border leading-relaxed whitespace-pre-wrap break-all">
+          {SETUP_CMD}
+        </pre>
         <p className="mt-3 text-[12px] text-text-muted leading-relaxed">
-          Override with <code className="text-sky/90 font-mono text-[11px]">VITE_API_BASE</code> at build time. Paths in this reference are
-          relative to this base (they include the <span className="font-mono">/api</span> prefix).
+          Requires <strong className="text-text-dim">Python 3.11+</strong> and the{' '}
+          <strong className="text-text-dim">Claude Code CLI</strong>. The script uses{' '}
+          <code className="font-mono text-[11px] text-sky/90">claude mcp add</code> under the hood.
         </p>
       </DocSection>
 
-      <DocSection title="Integration model" delay={80}>
-        <ul className="space-y-3 text-[14px] text-text-dim leading-relaxed list-none pl-0">
+      <DocSection title="Manual setup" delay={80}>
+        <p className="text-[14px] text-text-dim leading-relaxed mb-3">
+          If you prefer to configure manually, add this to your Claude Code MCP settings:
+        </p>
+        <pre className="saas-inset-sm rounded-xl p-4 font-mono text-[11px] text-text-dim overflow-x-auto border border-border leading-relaxed">
+{`claude mcp add -s user \\
+  -e FORGED_API_URL=http://localhost:8000 \\
+  forged -- python /path/to/mcp_server.py`}
+        </pre>
+      </DocSection>
+
+      <DocSection title="Start the backend" delay={120}>
+        <p className="text-[14px] text-text-dim leading-relaxed mb-3">
+          Forged's MCP server talks to the FastAPI backend. Start it before using any tools:
+        </p>
+        <pre className="saas-inset-sm rounded-xl p-4 font-mono text-[11px] text-text-dim overflow-x-auto border border-border leading-relaxed">
+{`cd /path/to/forged && ./dev.sh`}
+        </pre>
+        <p className="mt-3 text-[12px] text-text-muted leading-relaxed">
+          This starts both the Python backend (port 8000) and the React frontend (port 5173).
+        </p>
+      </DocSection>
+
+      <DocSection title="Try it" delay={160}>
+        <p className="text-[14px] text-text-dim leading-relaxed mb-3">
+          Open Claude Code and ask it to run a browser task. Forged handles everything:
+        </p>
+        <ul className="space-y-2 text-[14px] text-text-dim leading-relaxed list-none pl-0">
           <li className="flex gap-3">
             <span className="font-mono text-lime/80 text-[12px] shrink-0 pt-0.5">1.</span>
             <span>
-              <strong className="text-text font-medium">Start</strong> a run with a <code className="font-mono text-[12px] text-sky/90">POST</code> that returns{' '}
-              <code className="font-mono text-[12px]">session_id</code> (or two IDs for compare) immediately.
+              <em className="text-text">"Go to news.ycombinator.com and get the top story"</em> — first run, full agent, learns a template.
             </span>
           </li>
           <li className="flex gap-3">
             <span className="font-mono text-lime/80 text-[12px] shrink-0 pt-0.5">2.</span>
             <span>
-              <strong className="text-text font-medium">Poll</strong>{' '}
-              <code className="font-mono text-[12px] text-sky/90">GET …/status/&#123;session_id&#125;</code> about every{' '}
-              <strong className="text-text">500ms</strong> until <code className="font-mono text-[12px]">complete</code> or{' '}
-              <code className="font-mono text-[12px]">error</code>.
+              Run the same task again — Forged replays learned steps via Playwright. Visibly faster.
             </span>
           </li>
           <li className="flex gap-3">
             <span className="font-mono text-lime/80 text-[12px] shrink-0 pt-0.5">3.</span>
             <span>
-              Completed sessions are pruned after roughly <strong className="text-text">5 minutes</strong>—do not rely on old session IDs forever.
+              Ask <em className="text-text">"What skills has Forged learned?"</em> — Claude calls <code className="font-mono text-[12px] text-sky/90">list_learned_skills</code>.
             </span>
           </li>
         </ul>
-      </DocSection>
-
-      <DocSection title="Request body (task endpoints)" delay={120}>
-        <p className="text-[14px] text-text-dim mb-4 leading-relaxed">
-          All <code className="font-mono text-[12px]">POST</code> endpoints that accept a task use JSON:
-        </p>
-        <pre className="saas-inset-sm rounded-xl p-4 font-mono text-[12px] text-text-dim overflow-x-auto border border-border leading-relaxed">
-{`{
-  "task": "string"
-}`}
-        </pre>
-        <p className="mt-3 text-[12px] text-text-muted">
-          Constraints: <strong className="text-text-dim">3–2000</strong> characters.
-        </p>
       </DocSection>
     </DocPageShell>
   );

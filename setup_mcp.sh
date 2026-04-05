@@ -41,9 +41,9 @@ if ! command -v python3 &>/dev/null && ! command -v python &>/dev/null; then
 fi
 
 PYTHON=$(command -v python3 || command -v python)
-PY_VERSION=$($PYTHON -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-PY_MAJOR=$($PYTHON -c 'import sys; print(sys.version_info.major)')
-PY_MINOR=$($PYTHON -c 'import sys; print(sys.version_info.minor)')
+PY_VERSION=$("$PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+PY_MAJOR=$("$PYTHON" -c 'import sys; print(sys.version_info.major)')
+PY_MINOR=$("$PYTHON" -c 'import sys; print(sys.version_info.minor)')
 
 if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 11 ]; }; then
     fail "Python 3.11+ required, found $PY_VERSION"
@@ -102,8 +102,8 @@ info "Checking Python dependencies..."
 
 MISSING_DEPS=()
 
-$PYTHON -c "import mcp" 2>/dev/null || MISSING_DEPS+=("mcp")
-$PYTHON -c "import httpx" 2>/dev/null || MISSING_DEPS+=("httpx")
+"$PYTHON" -c "import mcp" 2>/dev/null || MISSING_DEPS+=("mcp")
+"$PYTHON" -c "import httpx" 2>/dev/null || MISSING_DEPS+=("httpx")
 
 if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     warn "Missing packages: ${MISSING_DEPS[*]}"
@@ -111,7 +111,7 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     read -r INSTALL_DEPS
     INSTALL_DEPS=${INSTALL_DEPS:-Y}
     if [[ "$INSTALL_DEPS" =~ ^[Yy] ]]; then
-        $PYTHON -m pip install "${MISSING_DEPS[@]}" --quiet
+        "$PYTHON" -m pip install "${MISSING_DEPS[@]}" --quiet
         ok "Installed: ${MISSING_DEPS[*]}"
     else
         fail "Cannot proceed without: ${MISSING_DEPS[*]}"
