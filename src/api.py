@@ -259,6 +259,20 @@ async def _run_agent(session_id: str, task: str, cdp_url: str, rocket_steps_done
     return history, bu_session
 
 
+def _extract_and_store_result(session_id: str, history) -> None:
+    """Extract the agent's final answer text and store it on the session."""
+    result_text = None
+    try:
+        result_text = history.final_result()
+    except Exception:
+        try:
+            result_text = str(history.final_result) if hasattr(history, 'final_result') else None
+        except Exception:
+            pass
+    if result_text:
+        _update(session_id, result=result_text)
+
+
 # ---------------------------------------------------------------------------
 # LEARN flow: agent runs → extract template → store in Supabase
 # ---------------------------------------------------------------------------
@@ -520,7 +534,10 @@ async def _run_chat(session_id: str, task: str) -> None:
 
             _update(session_id, phase="agent")
             _step(session_id, "Handing off to agent...", "agent", action_type="agent_action")
-            _, bu_session = await _run_agent(session_id, task, cdp_url, rocket_result.steps_completed)
+            history, bu_session = await _run_agent(session_id, task, cdp_url, rocket_result.steps_completed)
+
+            # Extract agent's final answer
+            _extract_and_store_result(session_id, history)
 
         else:
             # --- BASELINE + LEARN PATH ---
@@ -535,6 +552,9 @@ async def _run_chat(session_id: str, task: str) -> None:
 
             mgr, browser, cdp_url = await _create_browser(session_id)
             history, bu_session = await _run_agent(session_id, task, cdp_url)
+
+            # Extract agent's final answer
+            _extract_and_store_result(session_id, history)
 
             # Auto-learn
             _update(session_id, phase="learning")

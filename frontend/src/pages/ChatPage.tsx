@@ -43,10 +43,12 @@ export function ChatPage() {
   }, [navigate, timer]);
 
   const isRunning = status?.status === 'running' || status?.status === 'pending';
+  const isComplete = status?.status === 'complete';
   const phase = (status?.phase || 'idle') as Phase;
   const steps = status?.steps || [];
   const liveUrl = status?.live_url || null;
   const modeUsed = (status as any)?.mode_used || null;
+  const agentResult = (status as any)?.result || null;
 
   // ═══ IDLE STATE ═══
   if (!sessionId) {
@@ -155,7 +157,7 @@ export function ChatPage() {
 
           {/* Feed */}
           <div className="flex-1 min-h-0 overflow-hidden">
-            <ActionFeed steps={steps} isRunning={isRunning} />
+            <ActionFeed steps={steps} isRunning={isRunning} agentResult={agentResult} isComplete={isComplete} />
           </div>
         </div>
 
