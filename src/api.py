@@ -43,6 +43,8 @@ class StepInfo(BaseModel):
     type: str  # "playwright" or "agent"
     timestamp: float
     durationMs: float | None = None
+    action_type: str | None = None  # "navigate", "click", "fill", "search_web", "extract", "template_match", "done"
+    details: dict | None = None  # structured data for expandable cards
 
 
 class SessionStatus(BaseModel):
@@ -54,9 +56,13 @@ class SessionStatus(BaseModel):
     live_url: str | None = None
     duration_ms: float
     error: str | None = None
+    mode_used: str | None = None  # "rocket" or "baseline_learn"
+    template_match: dict | None = None  # {similarity, domain, task_pattern}
+    task: str | None = None  # original task text for session history
 
 
 sessions: dict[str, SessionStatus] = {}
+chat_sessions: list[str] = []  # ordered list of chat session IDs
 
 
 def _create_session() -> str:
@@ -81,7 +87,14 @@ def _update(sid: str, **kwargs: Any) -> None:
             setattr(s, k, v)
 
 
-def _step(sid: str, desc: str, stype: str, dur_ms: float | None = None) -> None:
+def _step(
+    sid: str,
+    desc: str,
+    stype: str,
+    dur_ms: float | None = None,
+    action_type: str | None = None,
+    details: dict | None = None,
+) -> None:
     s = sessions.get(sid)
     if s is None:
         return
@@ -91,6 +104,8 @@ def _step(sid: str, desc: str, stype: str, dur_ms: float | None = None) -> None:
         type=stype,
         timestamp=time.time() * 1000,
         durationMs=dur_ms,
+        action_type=action_type,
+        details=details,
     ))
     s.current_step = desc
 
@@ -113,10 +128,17 @@ def _fill_parameters(
     """
     filled: list[TemplateStep] = []
     for s in steps[: handoff_index + 1]:
+        action = s.get("action")
+        raw_timeout = s.get("timeout_ms", 5000)
+        # Guard against templates stored with wait_after_ms instead of
+        # action timeouts (pre-fix bug). Navigate needs at least 15s.
+        if action == "navigate" and raw_timeout < 10000:
+            raw_timeout = 15000
+
         step = TemplateStep(
             index=s.get("index", len(filled)),
             type=s.get("type", "fixed"),
-            action=s.get("action"),
+            action=action,
             url=s.get("url"),
             selector=s.get("selector"),
             fallback_selectors=s.get("fallback_selectors", []),
@@ -127,7 +149,7 @@ def _fill_parameters(
             amount=s.get("amount"),
             description=s.get("description"),
             agent_needed=s.get("agent_needed", False),
-            timeout_ms=s.get("timeout_ms", 5000),
+            timeout_ms=raw_timeout,
             on_failure=s.get("on_failure", "abort"),
         )
         # THE CRITICAL PIECE: fill parameterized values from extracted params
@@ -185,17 +207,42 @@ async def _run_agent(session_id: str, task: str, cdp_url: str, rocket_steps_done
             f"Pick up from the current state and complete the remaining work."
         )
 
+    # Map browser-use action names to display action types
+    ACTION_TYPE_MAP = {
+        "go_to_url": "navigate",
+        "click_element": "click",
+        "input_text": "fill",
+        "send_keys": "press",
+        "extract_content": "extract",
+        "extract_page_content": "extract",
+        "search_google": "search_web",
+        "done": "done",
+        "scroll_down": "scroll",
+        "scroll_up": "scroll",
+        "go_back": "navigate",
+        "switch_tab": "navigate",
+        "open_tab": "navigate",
+    }
+
     # Real-time step callback — streams each agent step to the frontend as it happens
     async def on_step(browser_state, model_output, n_steps):
         actions = model_output.action if model_output and model_output.action else []
         action_names = []
+        action_details = {}
+        classified_type = "agent_action"
         for a in actions:
             for k, v in a.model_dump(exclude_unset=True).items():
                 if v is not None and k != "index":
                     action_names.append(k)
+                    if k in ACTION_TYPE_MAP:
+                        classified_type = ACTION_TYPE_MAP[k]
+                    if isinstance(v, dict):
+                        action_details.update(v)
+                    elif isinstance(v, str):
+                        action_details[k] = v
         goal = model_output.next_goal if model_output else None
         desc = goal or ", ".join(action_names) or f"Step {n_steps}"
-        _step(session_id, f"Agent: {desc}", "agent")
+        _step(session_id, f"Agent: {desc}", "agent", action_type=classified_type, details=action_details or None)
 
     _step(session_id, "Agent starting...", "agent")
     agent = Agent(
@@ -319,13 +366,14 @@ async def _run_rocket(session_id: str, task: str) -> None:
         from src.matching.matcher import find_matching_template
         match = await find_matching_template(task)
 
-        if match is None or match.similarity < 0.75:
+        if match is None:
             _step(session_id, "No matching template found. Learn this task first!", "agent")
             elapsed = time.monotonic() * 1000 - start_ms
             _update(session_id, status="error", phase="error", duration_ms=elapsed, error="No matching template. Run Learn first.")
             return
 
-        _step(session_id, f"Template matched! {match.similarity:.0%} similarity to '{match.task_pattern}'", "playwright")
+        band_label = f"{match.confidence_band} confidence" if match.needs_verification else ""
+        _step(session_id, f"Template matched! {match.similarity:.0%} similarity to '{match.task_pattern}' {band_label}".strip(), "playwright")
 
         # Step 2: Extract parameters
         _step(session_id, "Extracting parameters from task...", "playwright")
@@ -389,6 +437,129 @@ async def _run_rocket(session_id: str, task: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# CHAT flow: auto-mode (rocket if template exists, baseline+learn if not)
+# ---------------------------------------------------------------------------
+
+
+async def _run_chat(session_id: str, task: str) -> None:
+    """Auto-mode chat: search for template, use rocket if found, baseline+learn if not."""
+    start_ms = time.monotonic() * 1000
+    mgr = browser = None
+
+    try:
+        _update(session_id, status="running", phase="rocket", task=task)
+
+        # Step 1: Search for matching template
+        _step(session_id, "Searching for matching template...", "playwright", action_type="template_match")
+
+        from src.matching.matcher import find_matching_template
+        match = await find_matching_template(task)
+
+        if match and match.confidence_band in ("high", "very_high"):
+            # --- ROCKET PATH ---
+            _update(session_id, mode_used="rocket", template_match={
+                "similarity": round(match.similarity, 3),
+                "domain": match.domain,
+                "task_pattern": match.task_pattern,
+            })
+            _step(
+                session_id,
+                f"Template matched! {match.similarity:.0%} similarity",
+                "playwright",
+                action_type="template_match",
+                details={"similarity": round(match.similarity, 3), "domain": match.domain, "pattern": match.task_pattern, "mode": "rocket"},
+            )
+
+            # Extract parameters
+            _step(session_id, "Extracting parameters...", "playwright", action_type="agent_action")
+            from src.template.extractor import extract_parameters
+            params = await extract_parameters(task, {
+                "task_pattern": match.task_pattern,
+                "parameters": match.parameters,
+            })
+            param_summary = ", ".join(f"{k}={v}" for k, v in params.items() if v)
+            if param_summary:
+                _step(session_id, f"Parameters: {param_summary}", "playwright", action_type="agent_action")
+
+            # Fill and execute
+            filled_steps = _fill_parameters(match.steps, params, match.handoff_index)
+            mgr, browser, cdp_url = await _create_browser(session_id)
+
+            _step(session_id, "Launching Playwright rocket...", "playwright", action_type="agent_action")
+            from src.browser.rocket import PlaywrightRocket
+            rocket = PlaywrightRocket()
+            rocket_result = await rocket.execute(cdp_url, filled_steps)
+
+            for i, timing in enumerate(rocket_result.step_timings):
+                if i < len(filled_steps):
+                    action = filled_steps[i].action or "step"
+                    desc = filled_steps[i].description or action
+                    _step(session_id, desc, "playwright", timing * 1000, action_type=action)
+
+            if rocket_result.aborted:
+                _step(session_id, f"Rocket aborted at step {rocket_result.steps_completed}: {rocket_result.abort_reason}", "playwright")
+
+            # Agent handoff
+            _update(session_id, phase="agent")
+            _step(session_id, "Handing off to agent...", "agent", action_type="agent_action")
+            await _run_agent(session_id, task, cdp_url, rocket_result.steps_completed)
+
+        else:
+            # --- BASELINE + LEARN PATH ---
+            _update(session_id, mode_used="baseline_learn", phase="agent")
+            if match:
+                _step(
+                    session_id,
+                    f"Low confidence match ({match.similarity:.0%}). Running full agent and learning...",
+                    "agent",
+                    action_type="template_match",
+                    details={"similarity": round(match.similarity, 3), "mode": "baseline_learn"},
+                )
+            else:
+                _step(
+                    session_id,
+                    "No template found. Running full agent and learning for next time...",
+                    "agent",
+                    action_type="template_match",
+                    details={"mode": "baseline_learn"},
+                )
+
+            mgr, browser, cdp_url = await _create_browser(session_id)
+            history = await _run_agent(session_id, task, cdp_url)
+
+            # Auto-learn from the run
+            _update(session_id, phase="learning")
+            _step(session_id, "Learning template from this run...", "agent", action_type="agent_action")
+            try:
+                from src.template.extractor import extract_template_from_trace
+                from src.template.generator import template_to_db_format
+                from src.db.templates import create_template
+
+                template = await extract_template_from_trace(history, task)
+                db_dict = template_to_db_format(template)
+                template_id = await create_template(**db_dict)
+                _step(session_id, f"Template learned! (ID: {template_id[:8]}...)", "agent", action_type="done")
+            except Exception as learn_err:
+                logger.warning("Auto-learn failed (non-fatal): %s", learn_err)
+                _step(session_id, "Could not extract template (task still completed)", "agent")
+
+        elapsed = time.monotonic() * 1000 - start_ms
+        _update(session_id, status="complete", phase="complete", duration_ms=elapsed, current_step="Done")
+
+    except Exception as e:
+        elapsed = time.monotonic() * 1000 - start_ms
+        logger.exception("Chat failed: %s", e)
+        _update(session_id, status="error", phase="error", duration_ms=elapsed, error=str(e), current_step=f"Error: {e}")
+
+    finally:
+        if mgr and browser:
+            try:
+                await mgr.stop(browser.browser_id)
+            except Exception:
+                pass
+
+
+# ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
 
@@ -413,6 +584,36 @@ class TaskRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+@app.post("/api/chat")
+async def chat(request: TaskRequest) -> dict:
+    """Start a chat session: auto-selects rocket or baseline+learn."""
+    sid = _create_session()
+    _update(sid, task=request.task)
+    chat_sessions.insert(0, sid)  # newest first
+    if len(chat_sessions) > 50:
+        chat_sessions.pop()
+    asyncio.create_task(_run_chat(sid, request.task))
+    return {"session_id": sid}
+
+
+@app.get("/api/chat/sessions")
+async def list_chat_sessions() -> list[dict]:
+    """List recent chat sessions for sidebar history."""
+    result = []
+    for sid in chat_sessions[:20]:
+        s = sessions.get(sid)
+        if s is None:
+            continue
+        result.append({
+            "session_id": s.session_id,
+            "task": s.task or "",
+            "status": s.status,
+            "mode_used": s.mode_used,
+            "duration_ms": s.duration_ms,
+        })
+    return result
+
+
 @app.post("/api/learn")
 async def learn(request: TaskRequest) -> dict:
     """Learn a task: run agent, extract template, store for future rockets."""
@@ -431,17 +632,19 @@ async def search_template(request: TaskRequest) -> dict:
     try:
         from src.matching.matcher import find_matching_template
         match = await find_matching_template(request.task)
-        if match and match.similarity >= 0.75:
+        if match:
             return {
                 "found": True,
                 "template_id": match.template_id,
                 "task_pattern": match.task_pattern,
                 "similarity": round(match.similarity, 3),
                 "confidence": round(match.confidence, 3),
+                "confidence_band": match.confidence_band,
                 "domain": match.domain,
                 "action_type": match.action_type,
                 "playwright_steps": match.handoff_index + 1,
                 "total_steps": len(match.steps),
+                "needs_verification": match.needs_verification,
             }
         return {"found": False}
     except Exception as e:
