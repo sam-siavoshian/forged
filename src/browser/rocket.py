@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 
 from playwright.async_api import (
@@ -47,19 +48,66 @@ async def _connect_playwright(cdp_url: str) -> tuple[Playwright, Browser, Page]:
     return pw, browser, page
 
 
+def _aria_label_from_css_selector(selector: str | None) -> str | None:
+    """Extract text from CSS [aria-label='...'] / [aria-label=\"...\"] for locator fallback."""
+    if not selector:
+        return None
+    m = re.search(r"aria-label\s*=\s*(['\"])([^'\"]+)\1", selector, re.I)
+    return m.group(2).strip() if m else None
+
+
+def _click_label_candidates(step: TemplateStep) -> list[str]:
+    """Build ordered labels for get_by_role('option') when CSS selectors are stale."""
+    seen: set[str] = set()
+    out: list[str] = []
+    v = (step.value or "").strip()
+    if v and len(v) < 200:
+        seen.add(v)
+        out.append(v)
+    for sel in [step.selector, *step.fallback_selectors]:
+        al = _aria_label_from_css_selector(sel)
+        if al and al not in seen:
+            seen.add(al)
+            out.append(al)
+    return out
+
+
+async def _try_click_role_option(page: Page, label: str, timeout_ms: int) -> bool:
+    """Amazon/native <select> options expose role=option; CSS often breaks after DOM churn."""
+    try:
+        loc = page.get_by_role("option", name=label, exact=False)
+        first = loc.first
+        await first.wait_for(state="visible", timeout=timeout_ms)
+        await first.click(timeout=timeout_ms)
+        return True
+    except Exception:
+        return False
+
+
 async def _try_selector(
     page: Page, step: TemplateStep, step_index: int
 ) -> str:
     """Try the primary selector, then each fallback. Returns the working selector.
 
+    Primary uses full timeout_ms; fallbacks use a short budget so 4 stale selectors
+    do not cost ~4× the full timeout (runtime evidence: ~20s for 4×5s).
+
     Raises RocketAbortError if none work.
     """
     selectors = [step.selector] + step.fallback_selectors if step.selector else []
+    nonempty = [s for s in selectors if s]
 
-    for selector in selectors:
+    for i, selector in enumerate(nonempty):
+        # First attempt: full budget (capped). Later: fast-fail — templates often
+        # store redundant fallbacks that all miss after a site redesign.
+        if i == 0:
+            budget = min(step.timeout_ms, 8000)
+        else:
+            budget = min(2000, max(800, step.timeout_ms // 3))
+
         try:
             await page.wait_for_selector(
-                selector, state=step.state, timeout=step.timeout_ms
+                selector, state=step.state, timeout=budget
             )
             return selector
         except PlaywrightTimeout:
@@ -68,9 +116,27 @@ async def _try_selector(
     raise RocketAbortError(
         step_index,
         step,
-        f"No selector found (tried {len(selectors)}): primary='{step.selector}', "
+        f"No selector found (tried {len(nonempty)}): primary='{step.selector}', "
         f"fallbacks={step.fallback_selectors}",
     )
+
+
+async def _execute_click(page: Page, step: TemplateStep, step_index: int) -> None:
+    """Click via CSS selector, then role=option by aria-label/value if CSS is stale."""
+    role_budget = min(3500, max(1500, step.timeout_ms))
+    try:
+        selector = await _try_selector(page, step, step_index)
+        await page.click(selector)
+        return
+    except RocketAbortError:
+        for label in _click_label_candidates(step):
+            if await _try_click_role_option(page, label, role_budget):
+                logger.info(
+                    "Click recovered via get_by_role(option) label=%r (CSS stale)",
+                    label[:60] + ("..." if len(label) > 60 else ""),
+                )
+                return
+        raise
 
 
 async def _execute_step(page: Page, step: TemplateStep, step_index: int) -> None:
@@ -87,8 +153,7 @@ async def _execute_step(page: Page, step: TemplateStep, step_index: int) -> None
             )
 
         elif step.action == "click":
-            selector = await _try_selector(page, step, step_index)
-            await page.click(selector)
+            await _execute_click(page, step, step_index)
 
         elif step.action in ("fill", "input"):
             # "input" is browser-use / template vocabulary; Playwright uses fill().

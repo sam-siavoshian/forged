@@ -10,14 +10,13 @@ import { PhaseIndicator } from './components/PhaseIndicator';
 import { ComparisonCard } from './components/ComparisonCard';
 import { TemplateSearchCard } from './components/TemplateSearchCard';
 import { ChatPage } from './pages/ChatPage';
-import { HomePage } from './pages/HomePage';
 import { DocsLayout } from './pages/docs/DocsLayout';
 import { usePoller } from './hooks/usePoller';
 import { useTimer } from './hooks/useTimer';
 import { startCompare, startLearn, getTemplates } from './api';
 import type { Template, Phase } from './types';
 
-type View = 'home' | 'chat' | 'chat_session' | 'learning' | 'racing' | 'results';
+type View = 'chat' | 'chat_session' | 'learning' | 'racing' | 'results';
 
 function pathToView(pathname: string): View {
   const p = pathname.replace(/\/+$/, '') || '/';
@@ -29,8 +28,7 @@ function pathToView(pathname: string): View {
   if (p === '/rl/results') return 'results';
   if (p === '/race') return 'racing';
   if (p === '/results') return 'results';
-  if (p === '/') return 'home';
-  return 'home';
+  return 'chat';
 }
 
 function App() {
@@ -87,7 +85,7 @@ function App() {
     const p = location.pathname.replace(/\/+$/, '') || '/';
     const allowed = ['/', '/learn', '/race', '/results', '/rl/learn', '/rl/race', '/rl/results'];
     if (!allowed.includes(p) && !p.startsWith('/chat/') && !p.startsWith('/learn/') && !p.startsWith('/docs')) {
-      navigate('/', { replace: true });
+      navigate('/learn', { replace: true });
     }
   }, [location.pathname, navigate]);
 
@@ -114,7 +112,7 @@ function App() {
       baseTimer.start();
       rocketTimer.start();
     } catch {
-      navigate('/');
+      navigate('/learn');
     } finally {
       setRaceStarting(false);
     }
@@ -132,7 +130,7 @@ function App() {
       setLearnId(sessionId);
       learnTimer.start();
     } catch {
-      navigate('/');
+      navigate('/learn');
     } finally {
       setLearnStarting(false);
     }
@@ -146,7 +144,7 @@ function App() {
     baseTimer.reset();
     rocketTimer.reset();
     learnTimer.reset();
-    navigate('/');
+    navigate('/learn');
     getTemplates().then(setTemplates).catch(() => {});
   }, [baseTimer, rocketTimer, learnTimer, navigate]);
 
@@ -174,6 +172,11 @@ function App() {
     );
   }
 
+  const pathNorm = location.pathname.replace(/\/+$/, '') || '/';
+  if (pathNorm === '/') {
+    return <Navigate to="/learn" replace />;
+  }
+
   return (
     <div className="h-full min-h-0 flex flex-col md:flex-row bg-bg">
       {/* Sidebar */}
@@ -195,13 +198,6 @@ function App() {
           <div className="absolute top-[-300px] left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full"
             style={{ background: 'radial-gradient(circle, rgba(200,255,0,0.02) 0%, transparent 65%)' }} />
         </div>
-
-        {/* ═══ HOME (choose what to do) ═══ */}
-        {view === 'home' && (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative z-10">
-            <HomePage />
-          </div>
-        )}
 
         {/* ═══ CHAT (browser agent — idle + session at /learn) ═══ */}
         {isChatView && (
@@ -462,7 +458,7 @@ function App() {
 
         {/* ═══ RESULTS VIEW ═══ */}
         {view === 'results' && (!baseStatus || !rocketStatus) && (
-          <Navigate to="/" replace />
+          <Navigate to="/learn" replace />
         )}
         {view === 'results' && baseStatus && rocketStatus && (
           <ComparisonCard baselineDurationMs={baseStatus.duration_ms} rocketDurationMs={rocketStatus.duration_ms} onReset={reset} />

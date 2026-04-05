@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from src.browser.rocket import (
     PlaywrightRocket,
     RocketAbortError,
+    _aria_label_from_css_selector,
     _execute_step,
     execute_rocket_phase,
 )
@@ -82,6 +83,43 @@ async def test_execute_step_fill_no_clear():
     await _execute_step(page, step, 0)
     assert page.fill.call_count == 1
     page.fill.assert_called_once_with("#input", "hello")
+
+
+def test_aria_label_from_css_selector_extracts_quoted_value():
+    assert _aria_label_from_css_selector(
+        "a[aria-label='Price: Low to High']"
+    ) == "Price: Low to High"
+    assert _aria_label_from_css_selector(
+        'button[aria-label="Sort by price"]'
+    ) == "Sort by price"
+    assert _aria_label_from_css_selector("#id-only") is None
+
+
+@pytest.mark.asyncio
+async def test_execute_step_click_role_option_when_css_times_out():
+    """Stale Amazon CSS; role=option matches native sort dropdown (see terminal logs)."""
+    from playwright.async_api import TimeoutError as PlaywrightTimeout
+
+    page = AsyncMock()
+    page.wait_for_selector.side_effect = PlaywrightTimeout("no css match")
+
+    mock_first = AsyncMock()
+    mock_first.wait_for = AsyncMock()
+    mock_first.click = AsyncMock()
+    mock_loc = MagicMock()
+    mock_loc.first = mock_first
+    page.get_by_role = MagicMock(return_value=mock_loc)
+
+    step = _step(
+        "click",
+        selector="a[aria-label='Price: Low to High']",
+        timeout_ms=5000,
+    )
+    await _execute_step(page, step, 0)
+
+    page.get_by_role.assert_called_once_with("option", name="Price: Low to High", exact=False)
+    mock_first.wait_for.assert_called_once()
+    mock_first.click.assert_called_once()
 
 
 @pytest.mark.asyncio
