@@ -9,35 +9,101 @@
 # ──────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-# ── Colors ────────────────────────────────────────────────────────────
+# ── Theme ─────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
+DIM='\033[2m'
 BOLD='\033[1m'
+ITALIC='\033[3m'
 NC='\033[0m'
+BAR="${DIM}│${NC}"
 
-info()  { printf "${CYAN}▸${NC} %s\n" "$*"; }
-ok()    { printf "${GREEN}✓${NC} %s\n" "$*"; }
-warn()  { printf "${YELLOW}!${NC} %s\n" "$*"; }
-fail()  { printf "${RED}✗${NC} %s\n" "$*"; exit 1; }
+# Clack-inspired primitives
+step_start() {
+    printf "${DIM}│${NC}\n"
+    printf "${GREEN}◆${NC}  ${BOLD}%s${NC}\n" "$1"
+}
+step_ok() {
+    printf "${BAR}  ${GREEN}✓${NC} %s\n" "$1"
+}
+step_warn() {
+    printf "${BAR}  ${YELLOW}▲${NC} %s\n" "$1"
+}
+step_fail() {
+    printf "${BAR}  ${RED}■${NC} %s\n" "$1"
+    printf "${DIM}│${NC}\n"
+    printf "${RED}◼${NC}  ${RED}Setup failed.${NC}\n\n"
+    exit 1
+}
+step_info() {
+    printf "${BAR}  ${DIM}%s${NC}\n" "$1"
+}
+step_end() {
+    printf "${DIM}│${NC}\n"
+}
+spinner() {
+    local pid=$1 msg=$2
+    local frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+    local i=0
+    while kill -0 "$pid" 2>/dev/null; do
+        printf "\r${BAR}  ${MAGENTA}${frames[$i]}${NC} ${DIM}%s${NC}" "$msg"
+        i=$(( (i + 1) % ${#frames[@]} ))
+        sleep 0.08
+    done
+    printf "\r${BAR}  ${GREEN}✓${NC} %s\n" "$msg"
+}
+prompt_input() {
+    local label="$1" default="$2" var_name="$3"
+    if [ -n "$default" ]; then
+        printf "${BAR}  ${BOLD}%s${NC} ${DIM}(%s)${NC}\n" "$label" "$default"
+    else
+        printf "${BAR}  ${BOLD}%s${NC}\n" "$label"
+    fi
+    printf "${BAR}  ${CYAN}❯${NC} "
+    local input
+    read -r input </dev/tty
+    eval "$var_name=\"\${input:-$default}\""
+}
+prompt_select() {
+    local label="$1" opt1="$2" opt2="$3" default="$4" var_name="$5"
+    printf "${BAR}  ${BOLD}%s${NC}\n" "$label"
+    if [ "$default" = "1" ]; then
+        printf "${BAR}    ${GREEN}●${NC} ${BOLD}%s${NC}\n" "$opt1"
+        printf "${BAR}    ${DIM}○${NC} ${DIM}%s${NC}\n" "$opt2"
+    else
+        printf "${BAR}    ${DIM}○${NC} ${DIM}%s${NC}\n" "$opt1"
+        printf "${BAR}    ${GREEN}●${NC} ${BOLD}%s${NC}\n" "$opt2"
+    fi
+    printf "${BAR}  ${DIM}Enter 1 or 2${NC} ${CYAN}❯${NC} "
+    local choice
+    read -r choice </dev/tty
+    eval "$var_name=\"\${choice:-$default}\""
+}
+prompt_confirm() {
+    local label="$1" var_name="$2"
+    printf "${BAR}  %s ${DIM}(Y/n)${NC} ${CYAN}❯${NC} " "$label"
+    local answer
+    read -r answer </dev/tty
+    eval "$var_name=\"\${answer:-Y}\""
+}
 
-# ── Banner ────────────────────────────────────────────────────────────
-printf "\n${BOLD}"
-cat << 'BANNER'
-  ╔═══════════════════════════════════════════════╗
-  ║          ⚒  FORGED  MCP  SERVER  ⚒           ║
-  ║   Self-improving browser automation for AI    ║
-  ╚═══════════════════════════════════════════════╝
-BANNER
-printf "${NC}\n"
+# ── Intro ─────────────────────────────────────────────────────────────
+printf "\n"
+printf "${CYAN}┌${NC}  ${BOLD}Forged${NC} ${DIM}— self-improving browser automation${NC}\n"
+printf "${BAR}\n"
+printf "${BAR}  Set up the MCP server for Claude Code, Cursor, or Windsurf.\n"
+printf "${BAR}  Your AI assistant learns from every browser task and gets faster.\n"
 
-# ── Step 1: Check prerequisites ───────────────────────────────────────
-info "Checking prerequisites..."
+# ── Step 1: Prerequisites ────────────────────────────────────────────
+step_start "Checking prerequisites"
 
 # Python 3.11+
 if ! command -v python3 &>/dev/null && ! command -v python &>/dev/null; then
-    fail "Python 3.11+ is required but not found. Install it first."
+    step_fail "Python 3.11+ is required. Install: https://python.org/downloads"
 fi
 
 PYTHON=$(command -v python3 || command -v python)
@@ -46,25 +112,24 @@ PY_MAJOR=$("$PYTHON" -c 'import sys; print(sys.version_info.major)')
 PY_MINOR=$("$PYTHON" -c 'import sys; print(sys.version_info.minor)')
 
 if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 11 ]; }; then
-    fail "Python 3.11+ required, found $PY_VERSION"
+    step_fail "Python 3.11+ required (found $PY_VERSION)"
 fi
-ok "Python $PY_VERSION"
+step_ok "Python $PY_VERSION"
 
 # Claude Code CLI
 if ! command -v claude &>/dev/null; then
-    fail "Claude Code CLI not found. Install it: https://docs.anthropic.com/en/docs/claude-code"
+    step_fail "Claude Code CLI not found. Install: https://docs.anthropic.com/en/docs/claude-code"
 fi
-ok "Claude Code CLI found"
+step_ok "Claude Code CLI"
 
-# ── Step 2: Locate or clone the Forged repo ──────────────────────────
-info "Looking for Forged installation..."
+# ── Step 2: Locate repo ──────────────────────────────────────────────
+step_start "Locating Forged"
 
-# Check if we're already inside the repo
 if [ -f "mcp_server.py" ] && [ -f "src/api.py" ]; then
     FORGED_DIR="$(pwd)"
-    ok "Found Forged in current directory: $FORGED_DIR"
+    step_ok "Found in current directory"
+    step_info "$FORGED_DIR"
 else
-    # Check common locations
     FORGED_DIR=""
     for candidate in \
         "$HOME/forged" \
@@ -79,132 +144,113 @@ else
     done
 
     if [ -z "$FORGED_DIR" ]; then
-        printf "\n"
-        printf "${YELLOW}Forged repo not found automatically.${NC}\n"
-        printf "Enter the full path to your Forged project directory:\n"
-        printf "${CYAN}> ${NC}"
-        read -r FORGED_DIR </dev/tty
-
-        # Expand ~ if present
+        step_warn "Not found automatically"
+        prompt_input "Path to Forged directory" "" FORGED_DIR
         FORGED_DIR="${FORGED_DIR/#\~/$HOME}"
 
         if [ ! -f "$FORGED_DIR/mcp_server.py" ]; then
-            fail "mcp_server.py not found in $FORGED_DIR"
+            step_fail "mcp_server.py not found in $FORGED_DIR"
         fi
     fi
-    ok "Found Forged at: $FORGED_DIR"
+    step_ok "Found Forged"
+    step_info "$FORGED_DIR"
 fi
 
 MCP_SERVER_PATH="$FORGED_DIR/mcp_server.py"
 
-# ── Step 3: Check Python dependencies ────────────────────────────────
-info "Checking Python dependencies..."
+# ── Step 3: Dependencies ─────────────────────────────────────────────
+step_start "Dependencies"
 
 MISSING_DEPS=()
-
 "$PYTHON" -c "import mcp" 2>/dev/null || MISSING_DEPS+=("mcp")
 "$PYTHON" -c "import httpx" 2>/dev/null || MISSING_DEPS+=("httpx")
 
 if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
-    warn "Missing packages: ${MISSING_DEPS[*]}"
-    printf "  Install them now? [Y/n] "
-    read -r INSTALL_DEPS </dev/tty
-    INSTALL_DEPS=${INSTALL_DEPS:-Y}
+    step_warn "Missing: ${MISSING_DEPS[*]}"
+    prompt_confirm "Install now?" INSTALL_DEPS
     if [[ "$INSTALL_DEPS" =~ ^[Yy] ]]; then
-        "$PYTHON" -m pip install "${MISSING_DEPS[@]}" --quiet
-        ok "Installed: ${MISSING_DEPS[*]}"
+        "$PYTHON" -m pip install "${MISSING_DEPS[@]}" --quiet &
+        spinner $! "Installing ${MISSING_DEPS[*]}"
+        wait $! 2>/dev/null
+        step_ok "Installed ${MISSING_DEPS[*]}"
     else
-        fail "Cannot proceed without: ${MISSING_DEPS[*]}"
+        step_fail "Cannot continue without: ${MISSING_DEPS[*]}"
     fi
 else
-    ok "All dependencies installed (mcp, httpx)"
+    step_ok "mcp, httpx"
 fi
 
-# ── Step 4: Configure backend URL ────────────────────────────────────
+# ── Step 4: Backend URL ──────────────────────────────────────────────
+step_start "Backend"
+
 DEFAULT_URL="http://localhost:8000"
+prompt_input "Forged backend URL" "$DEFAULT_URL" BACKEND_URL
 
-printf "\n"
-info "Where is the Forged backend running?"
-printf "  Press Enter for default (${CYAN}$DEFAULT_URL${NC}), or enter a custom URL:\n"
-printf "${CYAN}> ${NC}"
-read -r BACKEND_URL </dev/tty
-BACKEND_URL=${BACKEND_URL:-$DEFAULT_URL}
-
-# Quick health check (non-blocking — backend might not be running yet)
+# Health check
 if command -v curl &>/dev/null; then
     if curl -s --max-time 2 "$BACKEND_URL/api/health" &>/dev/null; then
-        ok "Backend is reachable at $BACKEND_URL"
+        step_ok "Backend reachable at $BACKEND_URL"
     else
-        warn "Backend not reachable at $BACKEND_URL (that's OK — start it before using Forged)"
+        step_warn "Not reachable yet (start it before using Forged)"
     fi
 fi
 
-# ── Step 5: Choose scope ─────────────────────────────────────────────
-printf "\n"
-info "Where should the MCP server be registered?"
-printf "  ${BOLD}1)${NC} User scope — available in all your Claude Code sessions (recommended)\n"
-printf "  ${BOLD}2)${NC} Project scope — only available in this project\n"
-printf "  Choice [1/2]: "
-read -r SCOPE_CHOICE </dev/tty
-SCOPE_CHOICE=${SCOPE_CHOICE:-1}
+# ── Step 5: Scope ────────────────────────────────────────────────────
+step_start "Registration scope"
+
+prompt_select \
+    "Where should Forged be available?" \
+    "All sessions (user scope)" \
+    "This project only (project scope)" \
+    "1" \
+    SCOPE_CHOICE
 
 case "$SCOPE_CHOICE" in
-    1) SCOPE="user" ;;
     2) SCOPE="project" ;;
     *) SCOPE="user" ;;
 esac
+step_ok "Using $SCOPE scope"
 
-ok "Using $SCOPE scope"
+# ── Step 6: Register ─────────────────────────────────────────────────
+step_start "Registering with Claude Code"
 
-# ── Step 6: Register with Claude Code ─────────────────────────────────
-printf "\n"
-info "Registering Forged MCP server with Claude Code..."
-
-# Remove existing registration if present (ignore errors)
+# Remove old registration silently
 claude mcp remove forged -s "$SCOPE" 2>/dev/null || true
 
-# Register using claude mcp add
-# Note: -e expects KEY=value as a single arg
-claude mcp add \
-    -s "$SCOPE" \
-    -e "FORGED_API_URL=${BACKEND_URL}" \
-    forged \
-    -- \
-    "$PYTHON" "$MCP_SERVER_PATH"
+# Register
+{
+    claude mcp add \
+        -s "$SCOPE" \
+        -e "FORGED_API_URL=${BACKEND_URL}" \
+        forged \
+        -- \
+        "$PYTHON" "$MCP_SERVER_PATH"
+} &>/dev/null &
+spinner $! "Registering MCP server"
+wait $! 2>/dev/null
 
-ok "Forged MCP server registered!"
-
-# ── Step 7: Verify ───────────────────────────────────────────────────
-printf "\n"
-info "Verifying registration..."
-
+# Verify
 if claude mcp get forged -s "$SCOPE" &>/dev/null; then
-    ok "Verified: 'forged' MCP server is registered"
+    step_ok "Registered and verified"
 else
-    warn "Could not verify registration. Try: claude mcp list"
+    step_warn "Registered (could not verify — try: claude mcp list)"
 fi
 
-# ── Done ──────────────────────────────────────────────────────────────
-printf "\n"
-printf "${BOLD}${GREEN}════════════════════════════════════════════════${NC}\n"
-printf "${BOLD}${GREEN}  Forged MCP Server is ready!${NC}\n"
-printf "${BOLD}${GREEN}════════════════════════════════════════════════${NC}\n"
-printf "\n"
-printf "  ${BOLD}Before using:${NC}\n"
-printf "    1. Start the Forged backend:\n"
-printf "       ${CYAN}cd $FORGED_DIR && ./dev.sh${NC}\n"
-printf "\n"
-printf "    2. Restart Claude Code (or start a new session)\n"
-printf "\n"
-printf "  ${BOLD}Then try:${NC}\n"
-printf "    Ask Claude Code to run a browser task:\n"
-printf "    ${CYAN}\"Go to news.ycombinator.com and get the top story\"${NC}\n"
-printf "\n"
-printf "    The first run uses a full AI agent.\n"
-printf "    The second run is ${BOLD}faster${NC} — learned steps replay via Playwright.\n"
-printf "\n"
-printf "  ${BOLD}Manage:${NC}\n"
-printf "    ${CYAN}claude mcp list${NC}           — see registered servers\n"
-printf "    ${CYAN}claude mcp get forged${NC}     — check Forged config\n"
-printf "    ${CYAN}claude mcp remove forged${NC}  — uninstall\n"
-printf "\n"
+# ── Outro ─────────────────────────────────────────────────────────────
+step_end
+printf "${GREEN}◆${NC}  ${BOLD}${GREEN}Setup complete!${NC}\n"
+printf "${BAR}\n"
+printf "${BAR}  ${BOLD}Next steps:${NC}\n"
+printf "${BAR}\n"
+printf "${BAR}  ${DIM}1.${NC} Start the backend:\n"
+printf "${BAR}     ${CYAN}cd \"$FORGED_DIR\" && ./dev.sh${NC}\n"
+printf "${BAR}\n"
+printf "${BAR}  ${DIM}2.${NC} Restart Claude Code ${DIM}(or open a new session)${NC}\n"
+printf "${BAR}\n"
+printf "${BAR}  ${DIM}3.${NC} Ask your AI assistant:\n"
+printf "${BAR}     ${ITALIC}\"Go to news.ycombinator.com and get the top story\"${NC}\n"
+printf "${BAR}\n"
+printf "${BAR}  Run it again — it gets ${BOLD}faster${NC} every time.\n"
+printf "${BAR}\n"
+printf "${BAR}  ${DIM}Manage:  claude mcp list · claude mcp get forged · claude mcp remove forged${NC}\n"
+printf "${DIM}└${NC}\n\n"
