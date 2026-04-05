@@ -254,10 +254,10 @@ function App() {
                 <div className="w-12 h-12 rounded-2xl bg-amber-400/10 flex items-center justify-center mx-auto mb-5">
                   <BrainIcon size={22} className="text-amber-400" />
                 </div>
-                <h2 className="text-[28px] font-serif italic text-text mb-3">What do you want to learn?</h2>
+                <h2 className="text-[28px] font-serif italic text-text mb-3">Teach a new skill</h2>
                 <p className="text-[14px] text-text-dim leading-relaxed max-w-[420px] mx-auto">
-                  Describe a site or flow to explore—the agent learns by doing: it records each step and turns the
-                  whole path into a playbook you can run again on similar pages.
+                  Show the agent how to do something once. It generalizes the pattern,
+                  parameterizes the variables, and replays it 5x faster next time.
                 </p>
               </div>
 
@@ -270,7 +270,7 @@ function App() {
               {templates.length > 0 && (
                 <div className="w-full max-w-2xl anim-fade-up" style={{ animationDelay: '120ms' }}>
                   <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-text-muted mb-4 text-center">
-                    {templates.length} learning{templates.length !== 1 ? 's' : ''} captured
+                    {templates.length} skill{templates.length !== 1 ? 's' : ''} learned
                   </p>
                   <div className="flex flex-col gap-2">
                     {templates.map((t) => (
@@ -324,9 +324,9 @@ function App() {
               {templates.length === 0 && (
                 <div className="text-center anim-fade-up" style={{ animationDelay: '120ms' }}>
                   <div className="saas-inset-sm px-8 py-6 rounded-2xl">
-                    <p className="text-[13px] text-text-dim mb-1">Nothing captured yet</p>
+                    <p className="text-[13px] text-text-dim mb-1">No skills yet</p>
                     <p className="text-[12px] text-text-muted">
-                      Describe something you want to learn above—the first run becomes your first saved playbook.
+                      Teach the agent something above. It learns the general pattern, not just the specific task.
                     </p>
                   </div>
                 </div>
@@ -339,7 +339,7 @@ function App() {
             <header className="flex-shrink-0 flex items-center gap-4 px-5 h-12 border-b border-border-subtle bg-surface/30 backdrop-blur-sm">
               <div className="flex items-center gap-2.5 flex-shrink-0">
                 <div className="w-[7px] h-[7px] rounded-full bg-amber-400 dot-pulse" />
-                <span className="text-[13px] font-medium text-amber-400">Learning Mode</span>
+                <span className="text-[13px] font-medium text-amber-400">Training</span>
               </div>
               <div className="flex-1 text-[12px] text-text-muted truncate font-mono min-w-0">{currentTask}</div>
               <Timer elapsedMs={learnTimer.elapsedMs} isComplete={learnStatus?.status === 'complete'} variant="baseline" />
@@ -350,10 +350,10 @@ function App() {
                   <div className="flex items-center gap-2.5 mb-4">
                     <PhaseIndicator phase={learnPh} />
                     <span className="text-[13px] text-text-dim">
-                      {learnPh === 'agent' && 'Agent running the task...'}
-                      {learnPh === 'learning' && 'Extracting template from trace...'}
-                      {learnPh === 'complete' && 'Template learned!'}
-                      {learnPh === 'error' && 'Learning failed'}
+                      {learnPh === 'agent' && 'Agent performing the task...'}
+                      {learnPh === 'learning' && 'Generalizing into a reusable skill...'}
+                      {learnPh === 'complete' && 'Skill learned!'}
+                      {learnPh === 'error' && 'Training failed'}
                       {learnPh === 'idle' && 'Starting...'}
                     </span>
                   </div>
@@ -366,12 +366,12 @@ function App() {
                   </div>
                   {learnStatus?.status === 'complete' && (
                     <div className="mt-8 saas-card p-6 text-center anim-scale-up" style={{ borderColor: 'rgba(200,255,0,0.15)', background: 'rgba(200,255,0,0.03)' }}>
-                      <div className="text-lime text-lg font-semibold mb-1.5">Template Learned!</div>
+                      <div className="text-lime text-lg font-semibold mb-1.5">Skill Learned!</div>
                       <p className="text-[13px] text-text-dim mb-5">
-                        Now type a <strong>similar</strong> task and hit <strong className="text-lime">Race</strong> to see the speedup.
+                        The agent generalized this into a reusable pattern. Try a <strong>variation</strong> and watch it run 5x faster.
                       </p>
                       <button onClick={reset} className="px-7 py-3 bg-lime text-bg rounded-xl text-[13px] font-medium saas-btn-primary">
-                        Race with a similar task
+                        Try a variation
                       </button>
                     </div>
                   )}
