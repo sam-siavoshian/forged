@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import random
 
 import httpx
 
@@ -13,6 +14,20 @@ from src.models import CloudBrowserSession
 logger = logging.getLogger("rocket_booster.cloud")
 
 BROWSER_USE_API_BASE = "https://api.browser-use.com/api/v3"
+
+
+def _wait_seconds_for_429(response: httpx.Response, attempt: int) -> float:
+    """Backoff for rate limits: prefer Retry-After, else exponential cap 120s + jitter."""
+    ra = response.headers.get("Retry-After")
+    if ra:
+        try:
+            w = float(ra.strip())
+            if 0 < w <= 600:
+                return w + random.uniform(0, 2)
+        except ValueError:
+            pass
+    base = min(5 * (2**attempt), 120)
+    return base + random.uniform(0, 3)
 
 
 def _get_api_key() -> str:
@@ -47,8 +62,9 @@ class CloudBrowserManager:
         if timeout_minutes != 60:
             body["timeout"] = timeout_minutes
 
-        max_retries = 3
+        max_retries = 6
         async with httpx.AsyncClient() as client:
+            response: httpx.Response | None = None
             for attempt in range(max_retries):
                 response = await client.post(
                     f"{BROWSER_USE_API_BASE}/browsers",
@@ -56,13 +72,26 @@ class CloudBrowserManager:
                     json=body,
                     timeout=30.0,
                 )
-                if response.status_code == 429 and attempt < max_retries - 1:
-                    wait = 2 ** attempt + 1  # 2s, 3s, 5s
-                    logger.warning("Rate limited (429), retrying in %ds (attempt %d/%d)", wait, attempt + 1, max_retries)
-                    await asyncio.sleep(wait)
-                    continue
+                if response.status_code == 429:
+                    if attempt < max_retries - 1:
+                        wait = _wait_seconds_for_429(response, attempt)
+                        logger.warning(
+                            "Rate limited (429), retrying in %.1fs (attempt %d/%d)",
+                            wait,
+                            attempt + 1,
+                            max_retries,
+                        )
+                        await asyncio.sleep(wait)
+                        continue
+                    raise RuntimeError(
+                        "Browser Use cloud API rate limit (429) after "
+                        f"{max_retries} attempts. Wait several minutes and try again, "
+                        "or check your quota at https://browser-use.com — heavy demo traffic "
+                        "often hits daily limits."
+                    )
                 response.raise_for_status()
                 break
+            assert response is not None
             data = response.json()
 
             if "cdpUrl" not in data:

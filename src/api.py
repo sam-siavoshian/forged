@@ -231,7 +231,13 @@ async def _run_agent(session_id: str, task: str, cdp_url: str, rocket_steps_done
             f"Pick up from the current state and complete the remaining work."
         )
 
+    _agent_step_clock: list[float] = [time.monotonic()]  # mutable container for closure
+
     async def on_step(browser_state, model_output, n_steps):
+        now = time.monotonic()
+        elapsed_ms = (now - _agent_step_clock[0]) * 1000
+        _agent_step_clock[0] = now
+
         actions = model_output.action if model_output and model_output.action else []
         action_names = []
         for a in actions:
@@ -240,7 +246,7 @@ async def _run_agent(session_id: str, task: str, cdp_url: str, rocket_steps_done
                     action_names.append(k)
         goal = model_output.next_goal if model_output else None
         desc = goal or ", ".join(action_names) or f"Step {n_steps}"
-        _step(session_id, f"Agent: {desc}", "agent")
+        _step(session_id, f"Agent: {desc}", "agent", elapsed_ms)
 
     _step(session_id, "Agent starting...", "agent")
     agent = Agent(
