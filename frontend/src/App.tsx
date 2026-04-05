@@ -65,8 +65,12 @@ function App() {
     if (rocketStatus?.status === 'complete' || rocketStatus?.status === 'error') rocketTimer.stop();
   }, [rocketStatus?.status]);
   useEffect(() => {
-    if (learnStatus?.status === 'complete' || learnStatus?.status === 'error') learnTimer.stop();
-  }, [learnStatus?.status]);
+    if (
+      learnStatus?.agent_complete ||
+      learnStatus?.status === 'complete' ||
+      learnStatus?.status === 'error'
+    ) learnTimer.stop();
+  }, [learnStatus?.agent_complete, learnStatus?.status]);
 
   useEffect(() => {
     if (baseStatus?.status === 'complete' && rocketStatus?.status === 'complete') {

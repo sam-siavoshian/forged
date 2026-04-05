@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ChatInput } from '../components/chat/ChatInput';
 import { ActionFeed } from '../components/chat/ActionFeed';
 import { SessionStats } from '../components/chat/SessionStats';
+import { ShiningText } from '../components/ui/shining-text';
 import { BrowserEmbed } from '../components/BrowserEmbed';
 import { usePoller } from '../hooks/usePoller';
 import { useTimer } from '../hooks/useTimer';
@@ -137,9 +138,12 @@ export function ChatPage() {
             {!isRunning && status?.status === 'error' && (
               <div className="w-2 h-2 rounded-full bg-amber shrink-0" />
             )}
-            <p className="text-[13px] text-text truncate flex-1">
-              {status?.task || 'Running task...'}
-            </p>
+            <div className="text-[13px] truncate flex-1">
+              {status?.task
+                ? <span className="text-text">{status.task}</span>
+                : <ShiningText text="Running task..." className="text-[13px]" />
+              }
+            </div>
             {modeUsed && (
               <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md shrink-0 ${
                 modeUsed === 'rocket' ? 'bg-lime/10 text-lime' : 'bg-amber/10 text-amber'

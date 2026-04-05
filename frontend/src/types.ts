@@ -18,13 +18,16 @@ export interface Step {
 
 export interface RunStatus {
   session_id: string;
-  status: 'pending' | 'running' | 'complete' | 'error';
+  status: 'pending' | 'running' | 'complete' | 'error' | 'not_found';
   phase: Phase;
   current_step: string;
   steps: Step[];
   live_url: string | null;
   duration_ms: number;
   error?: string;
+  result?: string;
+  agent_complete?: boolean;
+  agent_duration_ms?: number;
   mode_used?: 'rocket' | 'baseline_learn';
   template_match?: { similarity: number; domain: string; task_pattern: string };
   task?: string;

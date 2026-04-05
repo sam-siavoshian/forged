@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ActionCard } from './ActionCard';
+import { ShiningText } from '../ui/shining-text';
 import type { Step } from '../../types';
 
 interface ActionFeedProps {
@@ -21,7 +22,7 @@ export function ActionFeed({ steps, isRunning }: ActionFeedProps) {
           <div className="flex items-center gap-3 px-6 py-4"
                style={{ animation: 'fade-in 0.3s ease both' }}>
             <div className="w-2 h-2 rounded-full bg-sky dot-pulse" />
-            <span className="text-[12px] text-text-muted">Starting agent...</span>
+            <ShiningText text="Starting agent..." className="text-[12px]" />
           </div>
         )}
 
@@ -48,11 +49,8 @@ export function ActionFeed({ steps, isRunning }: ActionFeedProps) {
         {/* Thinking indicator */}
         {isRunning && steps.length > 0 && (
           <div className="flex items-center gap-3 px-6 py-3 ml-[6px]">
-            <div className="flex gap-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-text-muted thinking-dot" />
-              <div className="w-1.5 h-1.5 rounded-full bg-text-muted thinking-dot thinking-dot-2" />
-              <div className="w-1.5 h-1.5 rounded-full bg-text-muted thinking-dot thinking-dot-3" />
-            </div>
+            <div className="w-[7px] h-[7px] rounded-full bg-sky dot-pulse shrink-0" />
+            <ShiningText text="Thinking..." className="text-[12px]" />
           </div>
         )}
 

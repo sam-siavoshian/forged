@@ -59,6 +59,9 @@ class SessionStatus(BaseModel):
     mode_used: str | None = None  # "rocket" or "baseline_learn"
     template_match: dict | None = None  # {similarity, domain, task_pattern}
     task: str | None = None  # original task text
+    result: str | None = None  # agent's final answer text
+    agent_complete: bool = False  # True when agent finished (template may still be extracting)
+    agent_duration_ms: float | None = None  # agent-only duration (excludes template extraction)
 
 
 sessions: dict[str, SessionStatus] = {}
@@ -273,7 +276,24 @@ async def _run_learn(session_id: str, task: str) -> None:
 
         history, bu_session = await _run_agent(session_id, task, cdp_url)
 
-        _update(session_id, phase="learning")
+        # Signal agent completion immediately so frontend can stop the timer
+        # and show the result. Template extraction continues in background.
+        agent_elapsed = time.monotonic() * 1000 - start_ms
+        agent_result_text = None
+        try:
+            agent_result_text = history.final_result()
+        except Exception:
+            try:
+                agent_result_text = str(history.final_result) if hasattr(history, 'final_result') else None
+            except Exception:
+                pass
+        _update(
+            session_id,
+            phase="learning",
+            agent_complete=True,
+            agent_duration_ms=agent_elapsed,
+            result=agent_result_text,
+        )
         _step(session_id, "Extracting template from agent trace...", "agent")
 
         from src.template.extractor import extract_template_from_trace
