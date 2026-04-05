@@ -16,12 +16,11 @@ import { useTimer } from './hooks/useTimer';
 import { startCompare, startLearn, getTemplates } from './api';
 import type { Template, Phase } from './types';
 
-type View = 'chat' | 'chat_session' | 'docs' | 'learning' | 'racing' | 'results';
+type View = 'chat' | 'chat_session' | 'learning' | 'racing' | 'results';
 
 function pathToView(pathname: string): View {
   const p = pathname.replace(/\/+$/, '') || '/';
   if (p.startsWith('/chat/')) return 'chat_session';
-  if (p.startsWith('/docs')) return 'docs';
   if (p === '/rl/learn') return 'learning';
   if (p === '/rl/race') return 'racing';
   if (p === '/rl/results') return 'results';
@@ -152,28 +151,30 @@ function App() {
       rocketStatus?.status === 'complete',
   );
 
-  /** Docs uses its own sidebar only — hide Rocket chrome to avoid two sidebars. */
-  const showAppChrome = view !== 'docs';
+  const isDocsView = location.pathname.startsWith('/docs');
+  if (isDocsView) {
+    return (
+      <div className="h-screen min-h-0 flex flex-col bg-bg">
+        <DocsLayout />
+      </div>
+    );
+  }
 
   return (
-    <div className="h-screen min-h-0 flex flex-col md:flex-row" style={{ background: '#09090b' }}>
-      {showAppChrome && (
-        <AppSidebar
-          templates={templates}
-          sidebarOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
-          collapsed={sidebarCollapsed}
-          onCollapse={setSidebarCollapsed}
-        />
-      )}
+    <div className="h-screen min-h-0 flex flex-col md:flex-row bg-bg">
+      {/* Sidebar */}
+      <AppSidebar
+        templates={templates}
+        sidebarOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        collapsed={sidebarCollapsed}
+        onCollapse={setSidebarCollapsed}
+      />
 
-      {/* Main content area — only chat scrolls at this level; docs uses inner scroll so flex-1 height resolves */}
-      <div
-        className={`flex-1 min-h-0 min-w-0 flex flex-col relative ${
-          view === 'chat' ? 'overflow-y-auto' : 'overflow-hidden'
-        }`}
-      >
-        {showAppChrome && <MobileTopBar onToggle={() => setSidebarOpen(!sidebarOpen)} />}
+      {/* Main content area */}
+      <div className={`flex-1 min-w-0 flex flex-col relative ${view === 'chat' ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        {/* Mobile top bar */}
+        <MobileTopBar onToggle={() => setSidebarOpen(!sidebarOpen)} />
 
         {/* Ambient glow */}
         <div className="fixed inset-0 pointer-events-none z-0">
@@ -185,12 +186,6 @@ function App() {
         {isChatView && (
           <div className="flex-1 flex flex-col relative z-10">
             <ChatPage />
-          </div>
-        )}
-
-        {view === 'docs' && (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative z-10 w-full">
-            <DocsLayout />
           </div>
         )}
 

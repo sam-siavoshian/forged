@@ -24,15 +24,12 @@ export function EndpointRow({
   note: string;
 }) {
   return (
-    <div
-      className="rounded-xl border border-border/80 bg-elevated/30 overflow-hidden"
-      style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)' }}
-    >
-      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border/60 bg-black/20">
+    <div className="rounded-lg border border-border bg-surface overflow-hidden">
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 border-b border-border bg-black/15">
         <MethodBadge method={method} />
         <code className="font-mono text-[12px] md:text-[13px] text-text tracking-tight">{path}</code>
       </div>
-      <div className="px-4 py-3 space-y-2">
+      <div className="px-3 py-2.5 space-y-2">
         <p className="text-[11px] font-mono uppercase tracking-[0.12em] text-text-muted">Response</p>
         <p className="font-mono text-[11px] md:text-[12px] text-sky/85 break-words leading-relaxed">{res}</p>
         <p className="text-[13px] text-text-dim leading-relaxed pt-1">{note}</p>

@@ -14,22 +14,20 @@ export function DocPageShell({
   return (
     <div className="relative">
       <div
-        className="pointer-events-none absolute -top-6 -right-8 w-[min(55vw,420px)] h-[min(55vw,420px)] rounded-full opacity-[0.12]"
+        className="pointer-events-none absolute -top-8 -right-12 w-[min(50vw,380px)] h-[min(50vw,380px)] rounded-full opacity-[0.05]"
         style={{
-          background: 'radial-gradient(circle at 30% 30%, rgba(200,255,0,0.35) 0%, transparent 55%)',
+          background: 'radial-gradient(circle at 35% 35%, rgba(200,255,0,0.4) 0%, transparent 58%)',
         }}
       />
-      <div
-        className="pointer-events-none absolute top-24 left-0 w-px h-32 bg-gradient-to-b from-lime/40 via-lime/10 to-transparent -translate-x-4 hidden md:block"
-        aria-hidden
-      />
-      <header className="mb-10 md:mb-12 anim-fade-up relative">
+      <header className="mb-8 md:mb-10 anim-fade-up relative border-b border-border/50 pb-8">
         {kicker && (
-          <p className="text-[10px] font-mono uppercase tracking-[0.28em] text-text-muted mb-3">{kicker}</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted mb-2">{kicker}</p>
         )}
-        <h1 className="text-[clamp(1.5rem,3.5vw,2rem)] font-serif italic text-text leading-tight">{title}</h1>
+        <h1 className="text-[1.375rem] sm:text-[1.5rem] font-semibold text-text leading-snug tracking-[-0.02em]">
+          {title}
+        </h1>
       </header>
-      <div className="relative space-y-0">{children}</div>
+      <div className="relative space-y-0 text-[14px] leading-[1.65] text-text-dim">{children}</div>
     </div>
   );
 }
@@ -44,8 +42,8 @@ export function DocSection({
   delay?: number;
 }) {
   return (
-    <section className="mb-12 md:mb-16 last:mb-0 anim-fade-up" style={stagger(delay)}>
-      <h2 className="text-[11px] font-mono uppercase tracking-[0.22em] text-lime mb-4">{title}</h2>
+    <section className="mb-10 md:mb-12 last:mb-0 anim-fade-up" style={stagger(delay)}>
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-text-muted mb-3">{title}</h2>
       {children}
     </section>
   );

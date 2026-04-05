@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Command } from 'cmdk';
 import { useNavigate } from 'react-router-dom';
+import { SearchIcon } from 'lucide-animated';
 import { DOC_SEARCH_INDEX } from '../../docs/searchIndex';
 
 export function DocsCommandPalette({
@@ -32,49 +33,86 @@ export function DocsCommandPalette({
     return () => window.removeEventListener('keydown', esc);
   }, [open, onOpenChange]);
 
+  useEffect(() => {
+    if (!open) return;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-start justify-center pt-[min(18vh,160px)] px-4 pb-8 bg-black/65 backdrop-blur-md"
-      role="presentation"
-      onClick={() => onOpenChange(false)}
+      className="fixed inset-0 z-[200] flex items-start justify-center pt-[8vh] sm:pt-[12vh] px-3 sm:px-4 pb-8"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search documentation"
     >
-      <div
-        className="w-full max-w-lg rounded-2xl border border-border/90 bg-elevated shadow-[0_24px_80px_rgba(0,0,0,0.55)] overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="Search documentation"
+      {/* Linear-style: dim backdrop, click to close */}
+      <button
+        type="button"
+        aria-label="Close search"
+        className="fixed inset-0 bg-black/60 backdrop-blur-[3px] animate-[fade-in_0.1s_ease-out]"
+        onClick={() => onOpenChange(false)}
+      />
+
+      <Command
+        loop
+        className="relative z-10 flex w-full max-w-[500px] flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_16px_48px_-8px_rgba(0,0,0,0.65)] animate-[scale-up_0.14s_cubic-bezier(0.16,1,0.3,1)] max-h-[min(480px,70vh)] [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-2.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.08em] [&_[cmdk-group-heading]]:text-text-muted"
       >
-        <Command className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.18em] [&_[cmdk-group-heading]]:text-text-muted">
-          <div className="border-b border-border/70 flex items-center gap-2 px-3">
-            <span className="text-text-muted font-mono text-[11px] shrink-0">⌘K</span>
-            <Command.Input
-              placeholder="Search pages, endpoints…"
-              className="flex-1 bg-transparent py-3.5 text-[14px] text-text outline-none placeholder:text-text-muted"
-            />
-          </div>
-          <Command.List className="max-h-[min(52vh,360px)] overflow-y-auto py-2">
-            <Command.Empty className="py-8 text-center text-[13px] text-text-muted">No results.</Command.Empty>
-            <Command.Group heading="Documentation">
-              {DOC_SEARCH_INDEX.map((item) => (
-                <Command.Item
-                  key={item.id}
-                  value={`${item.title} ${item.keywords.join(' ')}`}
-                  onSelect={() => {
-                    navigate(item.path);
-                    onOpenChange(false);
-                  }}
-                  className="cursor-pointer px-3 py-2.5 mx-1 rounded-lg text-[13px] text-text-dim data-[selected=true]:bg-white/[0.06] data-[selected=true]:text-text aria-selected:bg-white/[0.06]"
-                >
-                  <span className="font-medium text-text">{item.title}</span>
-                  <span className="block text-[11px] text-text-muted mt-0.5 font-mono truncate">{item.path}</span>
-                </Command.Item>
-              ))}
-            </Command.Group>
-          </Command.List>
-        </Command>
-      </div>
+        {/* Search field — compact strip */}
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2 shrink-0">
+          <SearchIcon size={16} className="shrink-0 text-text-muted" aria-hidden />
+          <Command.Input
+            placeholder="Search documentation…"
+            autoFocus
+            className="flex-1 min-w-0 bg-transparent text-[13px] leading-snug text-text placeholder:text-text-muted outline-none py-0.5"
+          />
+          <kbd className="hidden sm:inline-flex shrink-0 items-center rounded-md border border-border/80 bg-black/35 px-1.5 py-0.5 font-mono text-[10px] text-text-muted">
+            ESC
+          </kbd>
+        </div>
+
+        <Command.List className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-1.5 outline-none scroll-py-1">
+          <Command.Empty className="py-10 text-center text-[13px] text-text-muted">
+            No results.
+          </Command.Empty>
+          <Command.Group heading="Documentation">
+            {DOC_SEARCH_INDEX.map((item) => (
+              <Command.Item
+                key={item.id}
+                value={`${item.title} ${item.keywords.join(' ')}`}
+                onSelect={() => {
+                  navigate(item.path);
+                  onOpenChange(false);
+                }}
+                className="flex cursor-pointer flex-col gap-0.5 rounded-md px-2 py-1.5 text-left outline-none data-[selected=true]:bg-white/[0.06] data-[selected=true]:text-text"
+              >
+                <span className="text-[13px] font-medium text-text">{item.title}</span>
+                <span className="truncate font-mono text-[11px] text-text-muted">{item.path}</span>
+              </Command.Item>
+            ))}
+          </Command.Group>
+        </Command.List>
+
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border/80 bg-black/25 px-3 py-1.5">
+          <p className="text-[11px] text-text-muted">
+            <kbd className="rounded border border-border/60 bg-black/30 px-1 py-px font-mono text-[10px]">↑</kbd>
+            <kbd className="ml-1 rounded border border-border/60 bg-black/30 px-1 py-px font-mono text-[10px]">↓</kbd>
+            <span className="ml-1.5">to navigate</span>
+            <span className="mx-2 text-border">·</span>
+            <kbd className="rounded border border-border/60 bg-black/30 px-1 py-px font-mono text-[10px]">↵</kbd>
+            <span className="ml-1">to open</span>
+          </p>
+          <p className="hidden sm:block text-[11px] text-text-muted/80">
+            <kbd className="rounded border border-border/50 bg-black/25 px-1.5 py-0.5 font-mono text-[10px]">⌘</kbd>
+            <kbd className="ml-0.5 rounded border border-border/50 bg-black/25 px-1.5 py-0.5 font-mono text-[10px]">K</kbd>
+            <span className="ml-1.5">toggle</span>
+          </p>
+        </div>
+      </Command>
     </div>
   );
 }

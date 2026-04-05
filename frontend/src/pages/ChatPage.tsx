@@ -1,26 +1,25 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChatInput } from '../components/chat/ChatInput';
 import { ActionFeed } from '../components/chat/ActionFeed';
 import { SessionStats } from '../components/chat/SessionStats';
 import { ShiningText } from '../components/ui/shining-text';
-import { GooeyFilter, GOOEY_FILTER_ID } from '../components/ui/gooey-filter';
-import { PixelTrail } from '../components/ui/pixel-trail';
+import { PixelBackground } from '../components/PixelBackground';
 import { BrowserEmbed } from '../components/BrowserEmbed';
 import { usePoller } from '../hooks/usePoller';
-import { useScreenSize } from '../hooks/use-screen-size';
 import { useTimer } from '../hooks/useTimer';
 import { startChat } from '../api';
 import { EXAMPLE_TASKS } from '../data/exampleTasks';
 import type { Phase } from '../types';
 
 export function ChatPage() {
-  const screenSize = useScreenSize();
   const { sessionId: urlSessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const [sessionId, setSessionId] = useState<string | null>(urlSessionId || null);
   const { status } = usePoller(sessionId);
   const timer = useTimer();
+  const idleHomeRef = useRef<HTMLDivElement>(null);
+  const idleContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (urlSessionId && urlSessionId !== sessionId) {
@@ -57,19 +56,14 @@ export function ChatPage() {
   // ═══ IDLE STATE ═══
   if (!sessionId) {
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-0 px-6 relative overflow-hidden">
-        <GooeyFilter id={GOOEY_FILTER_ID} strength={4} />
-        <div
-          className="home-trail-goo absolute inset-0 z-0 pointer-events-auto"
-          style={{ filter: `url(#${GOOEY_FILTER_ID})` }}
-        >
-          <PixelTrail
-            pixelSize={screenSize.lessThan('md') ? 24 : 32}
-            fadeDuration={0}
-            delay={500}
-            pixelClassName="home-trail-pixel"
-          />
-        </div>
+      <div
+        ref={idleHomeRef}
+        className="flex flex-col items-center justify-center h-full min-h-0 px-6 relative overflow-hidden"
+      >
+        <PixelBackground
+          interactionRootRef={idleHomeRef}
+          contentExclusionRef={idleContentRef}
+        />
 
         {/* Subtle radial glow behind the heading — cool moon, not lime wash */}
         <div
@@ -80,7 +74,10 @@ export function ChatPage() {
           }}
         />
 
-        <div className="flex flex-col items-center gap-6 max-w-[680px] w-full relative z-10 pointer-events-none">
+        <div
+          ref={idleContentRef}
+          className="flex flex-col items-center gap-6 max-w-[680px] w-full relative z-10 pointer-events-none"
+        >
           {/* Heading */}
           <div className="text-center" style={{ animation: 'fade-up 0.5s cubic-bezier(0.16,1,0.3,1) both' }}>
             <h1
@@ -90,7 +87,7 @@ export function ChatPage() {
               What should I do?
             </h1>
             <p className="text-[14px] text-text-dim mt-4 max-w-[440px] mx-auto leading-[1.7]">
-              Describe a browser task. If I've seen it before, I'll be fast.
+              Describe a browser task. If I&apos;ve seen it before, I&apos;ll be fast.
             </p>
           </div>
 
@@ -110,6 +107,7 @@ export function ChatPage() {
             {EXAMPLE_TASKS.map((ex) => (
               <button
                 key={ex.id}
+                type="button"
                 onClick={() => handleSubmit(ex.task)}
                 className="group px-3.5 py-2 rounded-xl text-[12px] text-text-dim
                            transition-all duration-200 cursor-pointer"

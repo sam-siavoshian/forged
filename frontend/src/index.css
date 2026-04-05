@@ -6,18 +6,19 @@
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --font-sans: 'DM Sans', system-ui, sans-serif;
 
-  --color-bg: #09090b;
-  --color-surface: #111113;
-  --color-elevated: #19191d;
-  --color-border: #232328;
-  --color-border-subtle: #1a1a1f;
+  /* Linear-like neutrals: crisp hairlines, layered surfaces */
+  --color-bg: #0b0b0c;
+  --color-surface: #0f0f12;
+  --color-elevated: #141418;
+  --color-border: #2a2a31;
+  --color-border-subtle: #1e1e24;
 
-  --color-sidebar: #0c0c0e;
-  --color-sidebar-border: #1a1a1f;
+  --color-sidebar: #0a0a0c;
+  --color-sidebar-border: #1f1f26;
 
-  --color-text: #ececee;
-  --color-text-dim: #9898a0;
-  --color-text-muted: #55555e;
+  --color-text: #f4f4f5;
+  --color-text-dim: #a1a1aa;
+  --color-text-muted: #71717a;
 
   --color-lime: #c8ff00;
   --color-lime-soft: rgba(200, 255, 0, 0.07);
@@ -25,9 +26,6 @@
   --color-amber-soft: rgba(255, 107, 53, 0.07);
   --color-sky: #38bdf8;
   --color-sky-soft: rgba(56, 189, 248, 0.07);
-
-  /* Ambient home trail — cool moonlight (not neon lime) */
-  --color-ambient-mist: #9eb6e8;
 }
 
 /* ── Base ────────────────────────────── */
@@ -40,19 +38,12 @@ html, body, #root {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
-/* ── Grain ───────────────────────────── */
-
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 0.02;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+::selection {
+  background: rgba(200, 255, 0, 0.18);
+  color: var(--color-text);
 }
 
 /* ── Scrollbar ───────────────────────── */
@@ -219,43 +210,27 @@ body::after {
 
 /* ── Sidebar ────────────────────────── */
 
+/* Linear-style nav rows: flat, fast, left accent on active */
 .sidebar-nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
-  border-radius: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
   color: var(--color-text-dim);
-  transition: all 0.15s ease;
+  transition: background 0.1s ease, color 0.1s ease, box-shadow 0.1s ease;
 }
 
 .sidebar-nav-item:hover {
   color: var(--color-text);
   background: rgba(255, 255, 255, 0.04);
-  box-shadow:
-    inset 0 2px 6px 0 rgba(0, 0, 0, 0.15),
-    inset 0 -1px 3px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: none;
 }
 
 .sidebar-nav-item.active {
   color: var(--color-text);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow:
-    inset 0 4px 10px 0 rgba(0, 0, 0, 0.25),
-    inset 0 1px 3px 0 rgba(0, 0, 0, 0.15),
-    inset 0 -2px 6px 0 rgba(255, 255, 255, 0.04),
-    0 1px 0 0 rgba(255, 255, 255, 0.04);
-}
-
-/* ── Chat home: gooey cursor trail (refined, no muddy yellow-green) ─ */
-
-.home-trail-goo {
-  opacity: 0.68;
-  mix-blend-mode: plus-lighter;
-}
-
-.home-trail-pixel {
-  background-color: color-mix(in oklab, var(--color-ambient-mist) 26%, transparent);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 2px 0 0 0 var(--color-lime);
 }

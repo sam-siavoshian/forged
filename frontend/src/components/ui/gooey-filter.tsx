@@ -1,14 +1,15 @@
-const GOOEY_FILTER_ID = 'gooey-filter-pixel-trail';
-
-function GooeyFilter({
-  id = GOOEY_FILTER_ID,
+const GooeyFilter = ({
+  id = 'goo-filter',
   strength = 10,
 }: {
   id?: string;
   strength?: number;
-}) {
+}) => {
   return (
-    <svg className="pointer-events-none absolute h-0 w-0 overflow-hidden" aria-hidden>
+    <svg
+      className="fixed w-0 h-0 overflow-hidden pointer-events-none"
+      aria-hidden
+    >
       <defs>
         <filter id={id}>
           <feGaussianBlur in="SourceGraphic" stdDeviation={strength} result="blur" />
@@ -23,6 +24,6 @@ function GooeyFilter({
       </defs>
     </svg>
   );
-}
+};
 
-export { GooeyFilter, GOOEY_FILTER_ID };
+export { GooeyFilter };

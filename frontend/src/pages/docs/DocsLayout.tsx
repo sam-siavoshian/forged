@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { MenuIcon, SearchIcon } from 'lucide-animated';
 import { VALID_DOC_SLUGS } from '../../docs/constants';
 import { DocsSidebar } from './DocsSidebar';
+import { DocsTopNav } from './DocsTopNav';
 import { DocsCommandPalette } from '../../components/docs/DocsCommandPalette';
 import { OverviewPage } from './pages/OverviewPage';
 import { IntegrationPage } from './pages/IntegrationPage';
@@ -45,44 +45,23 @@ export function DocsLayout() {
   );
 
   return (
-    <div className="flex flex-1 min-h-0 w-full min-w-0 relative z-10">
+    <div className="flex flex-col flex-1 min-h-0 w-full min-w-0 relative z-10">
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        className="pointer-events-none absolute inset-0 opacity-[0.04]"
         style={{
-          backgroundImage: `radial-gradient(ellipse 80% 50% at 100% 0%, rgba(200,255,0,0.25) 0%, transparent 50%),
-            radial-gradient(ellipse 60% 40% at 0% 100%, rgba(56,189,248,0.12) 0%, transparent 45%)`,
+          backgroundImage: `radial-gradient(ellipse 90% 55% at 100% -10%, rgba(200,255,0,0.12) 0%, transparent 52%),
+            radial-gradient(ellipse 70% 45% at 0% 100%, rgba(56,189,248,0.06) 0%, transparent 48%)`,
         }}
         aria-hidden
       />
-      <DocsSidebar
-        mobileOpen={mobileNavOpen}
-        onMobileClose={() => setMobileNavOpen(false)}
-        onOpenSearch={() => setSearchOpen(true)}
-      />
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
-        <header className="md:hidden flex items-center justify-between gap-3 px-4 h-12 border-b border-border/60 bg-surface/40 backdrop-blur-sm shrink-0">
-          <button
-            type="button"
-            onClick={() => setMobileNavOpen(true)}
-            className="w-9 h-9 flex items-center justify-center rounded-xl text-text-dim hover:text-text hover:bg-white/[0.06] transition-colors"
-            aria-label="Open documentation menu"
-          >
-            <MenuIcon size={18} />
-          </button>
-          <span className="text-[12px] font-mono uppercase tracking-[0.15em] text-text-muted">API docs</span>
-          <button
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            className="w-9 h-9 flex items-center justify-center rounded-xl text-text-dim hover:text-text hover:bg-white/[0.06] transition-colors"
-            aria-label="Search documentation"
-          >
-            <SearchIcon size={18} />
-          </button>
-        </header>
+      <DocsTopNav onOpenSearch={() => setSearchOpen(true)} onOpenMenu={() => setMobileNavOpen(true)} />
 
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-          <div className="max-w-3xl mx-auto px-5 md:px-10 pt-8 md:pt-12 pb-24 md:pb-28">{page}</div>
+      <div className="flex flex-1 min-h-0 min-w-0 relative">
+        <DocsSidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden scroll-smooth">
+          <div className="max-w-2xl mx-auto px-5 md:px-8 pt-7 md:pt-10 pb-20 md:pb-24">{page}</div>
         </main>
       </div>
 

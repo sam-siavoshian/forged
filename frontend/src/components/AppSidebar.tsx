@@ -104,7 +104,7 @@ export function AppSidebar({ templates, sidebarOpen, onToggle, collapsed, onColl
 
           {/* RL Training section */}
           {!collapsed && (
-            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-muted px-3 py-1">
+            <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-text-muted px-3 py-1">
               RL Training
             </p>
           )}
@@ -129,7 +129,7 @@ export function AppSidebar({ templates, sidebarOpen, onToggle, collapsed, onColl
           {/* Templates section */}
           {!collapsed && (
             <div className="flex flex-col gap-0.5">
-              <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-muted px-3 py-1.5">
+              <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-text-muted px-3 py-1.5">
                 Learned
               </p>
               {templates.length === 0 ? (
@@ -227,19 +227,6 @@ export function AppSidebar({ templates, sidebarOpen, onToggle, collapsed, onColl
             <FileTextIcon size={16} className={currentPath.startsWith('/docs') ? 'text-lime' : ''} />
             {!collapsed && <span>API docs</span>}
           </button>
-          {!collapsed ? (
-            <div className="saas-inset-sm px-3 py-2.5">
-              <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-text-muted mb-1">Workspace</p>
-              <p className="text-[12px] text-text-dim truncate">Rocket Booster</p>
-              <p className="text-[10px] text-text-muted mt-0.5">{templates.length} template{templates.length !== 1 ? 's' : ''} learned</p>
-            </div>
-          ) : (
-            <div className="flex justify-center">
-              <div className="w-8 h-8 rounded-lg bg-elevated flex items-center justify-center text-[11px] font-mono text-text-muted">
-                {templates.length}
-              </div>
-            </div>
-          )}
         </div>
       </aside>
     </>

@@ -1,32 +1,24 @@
 import { useEffect, useState } from 'react';
 
 const SCREEN_SIZES = ['xs', 'sm', 'md', 'lg', 'xl', '2xl'] as const;
-
 export type ScreenSize = (typeof SCREEN_SIZES)[number];
 
 const sizeOrder: Record<ScreenSize, number> = {
-  xs: 0,
-  sm: 1,
-  md: 2,
-  lg: 3,
-  xl: 4,
-  '2xl': 5,
+  xs: 0, sm: 1, md: 2, lg: 3, xl: 4, '2xl': 5,
 } as const;
 
 export interface ComparableScreenSize {
-  readonly value: ScreenSize;
-  toString: () => ScreenSize;
-  valueOf: () => number;
-  equals: (other: ScreenSize) => boolean;
-  lessThan: (other: ScreenSize) => boolean;
-  greaterThan: (other: ScreenSize) => boolean;
-  lessThanOrEqual: (other: ScreenSize) => boolean;
-  greaterThanOrEqual: (other: ScreenSize) => boolean;
+  toString(): ScreenSize;
+  valueOf(): number;
+  equals(other: ScreenSize): boolean;
+  lessThan(other: ScreenSize): boolean;
+  greaterThan(other: ScreenSize): boolean;
+  lessThanOrEqual(other: ScreenSize): boolean;
+  greaterThanOrEqual(other: ScreenSize): boolean;
 }
 
 function createComparableScreenSize(value: ScreenSize): ComparableScreenSize {
   return {
-    value,
     toString: () => value,
     valueOf: () => sizeOrder[value],
     equals: (other: ScreenSize) => value === other,
@@ -37,34 +29,25 @@ function createComparableScreenSize(value: ScreenSize): ComparableScreenSize {
   };
 }
 
-function useScreenSize(): ComparableScreenSize {
+const useScreenSize = (): ComparableScreenSize => {
   const [screenSize, setScreenSize] = useState<ScreenSize>('xs');
 
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
-
-      if (width >= 1536) {
-        setScreenSize('2xl');
-      } else if (width >= 1280) {
-        setScreenSize('xl');
-      } else if (width >= 1024) {
-        setScreenSize('lg');
-      } else if (width >= 768) {
-        setScreenSize('md');
-      } else if (width >= 640) {
-        setScreenSize('sm');
-      } else {
-        setScreenSize('xs');
-      }
+      if (width >= 1536) setScreenSize('2xl');
+      else if (width >= 1280) setScreenSize('xl');
+      else if (width >= 1024) setScreenSize('lg');
+      else if (width >= 768) setScreenSize('md');
+      else if (width >= 640) setScreenSize('sm');
+      else setScreenSize('xs');
     };
-
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   return createComparableScreenSize(screenSize);
-}
+};
 
 export { useScreenSize };
