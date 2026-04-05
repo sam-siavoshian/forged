@@ -202,10 +202,10 @@ class PlaywrightRocket:
             )
 
         finally:
-            # CRITICAL: disconnect() releases CDP without killing the BaaS browser.
-            # close() would destroy the remote browser session.
-            if browser:
-                await browser.disconnect()
+            # Release CDP connection without destroying the BaaS browser.
+            # Playwright 1.48+ doesn't have disconnect() on Browser.
+            # Stopping the Playwright instance releases the CDP connection
+            # without sending a Browser.close command to the remote browser.
             if pw:
                 await pw.stop()
 
