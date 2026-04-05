@@ -39,6 +39,7 @@ class TemplateMatch:
     domain: str
     action_type: str
     needs_verification: bool  # True for medium band (0.50-0.74)
+    extraction_selectors: dict[str, Any] | None = None
 
 
 def _domain_matches(stored: str, query: str) -> bool:
@@ -230,6 +231,14 @@ async def find_matching_template(
     if isinstance(parameters, str):
         parameters = json.loads(parameters)
 
+    # Parse extraction_selectors from DB row
+    extraction_selectors = row.get("extraction_selectors")
+    if isinstance(extraction_selectors, str):
+        try:
+            extraction_selectors = json.loads(extraction_selectors)
+        except (json.JSONDecodeError, TypeError):
+            extraction_selectors = None
+
     return TemplateMatch(
         template_id=str(row["id"]),
         task_pattern=row["task_pattern"],
@@ -242,4 +251,5 @@ async def find_matching_template(
         domain=row.get("domain", domain),
         action_type=row.get("action_type", action_type or "unknown"),
         needs_verification=needs_verification,
+        extraction_selectors=extraction_selectors,
     )
