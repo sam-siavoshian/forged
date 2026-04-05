@@ -64,9 +64,20 @@ _template_cache: dict[tuple[str, str | None], TemplateMatch] = {}
 
 def cache_template(match: TemplateMatch) -> None:
     """Populate the in-memory template cache (called after auto-learn too)."""
-    key = (match.domain, match.action_type)
-    _template_cache[key] = match
+    _template_cache[match.domain] = match
     logger.info("Template cached: domain=%s action_type=%s", match.domain, match.action_type)
+
+
+def _cache_lookup(domain: str, action_type: str | None) -> TemplateMatch | None:
+    """Flexible cache lookup: tries exact domain, then subdomain matching."""
+    # Exact hit
+    if domain in _template_cache:
+        return _template_cache[domain]
+    # Subdomain matching (en.wikipedia.org → wikipedia.org, or vice versa)
+    for cached_domain, match in _template_cache.items():
+        if _domain_matches(cached_domain, domain):
+            return match
+    return None
 
 
 async def _search_via_pgvector(
@@ -198,9 +209,8 @@ async def find_matching_template(
     logger.info("Matching: domain=%s action_type=%s", domain, action_type)
 
     # Fast path: check in-memory cache before hitting embeddings/DB
-    cache_key = (domain, action_type)
-    if cache_key in _template_cache:
-        cached = _template_cache[cache_key]
+    cached = _cache_lookup(domain, action_type)
+    if cached:
         logger.info(
             "Cache hit: domain=%s action_type=%s template=%s (skipping embedding search)",
             domain, action_type, cached.template_id[:8],
