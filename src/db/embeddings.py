@@ -1,10 +1,11 @@
 """OpenAI embedding generation for task templates.
 
-Uses text-embedding-3-large (3072 dimensions) with rich composite text
-that captures task semantics, step structure, parameters, and domain context.
+Uses text-embedding-3-large (3072 dimensions) with normalized structural
+text so that task variations match their templates.
 """
 
 import os
+import re
 from functools import lru_cache
 from typing import Any
 
@@ -29,6 +30,42 @@ def _get_openai() -> OpenAI:
     return _openai_client
 
 
+def _normalize_task_for_embedding(text: str) -> str:
+    """Normalize a task description to its structural pattern.
+
+    Strips specific parameter values so that "search for Dog" and
+    "search for artificial intelligence" produce similar embeddings.
+    Keeps action verbs and domain references.
+
+    Examples:
+      "Go to wikipedia.org, search for 'Dog', and extract the first and second paragraph"
+      → "go to wikipedia.org, search for [query], and extract [content]"
+
+      "Go to amazon.com, search for 'wireless mouse', sort by price low to high"
+      → "go to amazon.com, search for [query], sort by [criteria]"
+    """
+    t = text.lower()
+
+    # Remove quoted strings: "Dog", 'artificial intelligence', "wireless mouse"
+    t = re.sub(r'"[^"]*"', '[query]', t)
+    t = re.sub(r"'[^']*'", '[query]', t)
+
+    # Replace {param_name} placeholders with [param] (for stored patterns)
+    t = re.sub(r'\{[^}]+\}', '[param]', t)
+
+    # Replace "#N" patterns (like "#1 story") with [rank]
+    t = re.sub(r'#\d+', '[rank]', t)
+
+    # Normalize extraction scope: "first paragraph", "first and second paragraph",
+    # "top 3 comments", "all ingredients" → [content]
+    t = re.sub(r'(the\s+)?(first|second|third|top|all|every)\s+(and\s+\w+\s+)?(paragraph|comment|result|ingredient|item|section|entry|review)s?', '[content]', t)
+
+    # Collapse multiple spaces
+    t = re.sub(r'\s+', ' ', t).strip()
+
+    return t
+
+
 def build_embedding_text(
     task_pattern: str,
     steps: list[dict[str, Any]],
@@ -37,14 +74,13 @@ def build_embedding_text(
     action_type: str,
     site_knowledge: dict[str, Any] | None = None,
 ) -> str:
-    """Build a text representation for embedding.
+    """Build a normalized text representation for embedding.
 
-    Uses the same format as query embeddings (task + domain + action) so that
-    cosine similarity between stored and query embeddings is high when the
-    task semantics match. Previously included step/param structure which
-    penalized similarity because queries never have that info.
+    Normalizes the task pattern to its structural skeleton so that
+    variations of the same task type produce similar embeddings.
     """
-    lines = [f"task: {task_pattern}"]
+    normalized = _normalize_task_for_embedding(task_pattern)
+    lines = [f"task: {normalized}"]
     lines.append(f"domain: {domain}")
     lines.append(f"action: {action_type}")
     return "\n".join(lines)
@@ -55,12 +91,13 @@ def build_query_embedding_text(
     domain: str | None = None,
     action_type: str | None = None,
 ) -> str:
-    """Build a partial rich text for query embeddings.
+    """Build a normalized query embedding text.
 
-    Queries don't have steps/params, so we include only the metadata
-    we can infer (domain, action_type) to improve matching accuracy.
+    Normalizes the user's task to its structural skeleton, matching
+    the format used for stored template embeddings.
     """
-    lines = [f"task: {task_description}"]
+    normalized = _normalize_task_for_embedding(task_description)
+    lines = [f"task: {normalized}"]
     if domain:
         lines.append(f"domain: {domain}")
     if action_type:

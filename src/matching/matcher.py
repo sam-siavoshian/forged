@@ -142,7 +142,16 @@ async def _search_via_rest(
         if t_norm == 0:
             continue
         sim = float(np.dot(query_vec, t_vec) / (query_norm * t_norm))
-        t["similarity"] = sim
+
+        # Boost similarity when domain and action type match.
+        # This prevents near-misses from falling below threshold
+        # when the task structure is clearly the same.
+        if _domain_matches(t.get("domain", ""), domain):
+            sim += 0.05
+        if action_type and t.get("action_type") == action_type:
+            sim += 0.05
+
+        t["similarity"] = min(sim, 1.0)  # cap at 1.0
         scored.append(t)
 
     scored.sort(key=lambda x: x["similarity"], reverse=True)
