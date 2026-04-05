@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { Step, Phase } from '../types';
 
 interface StepTrackerProps {
@@ -7,6 +8,7 @@ interface StepTrackerProps {
 }
 
 export function StepTracker({ steps, phase, currentStep }: StepTrackerProps) {
+  const bottomRef = useRef<HTMLDivElement>(null);
   const isActive =
     phase === 'rocket' || phase === 'agent' || phase === 'learning';
   const lastStepDescription = steps[steps.length - 1]?.description;
@@ -15,6 +17,12 @@ export function StepTracker({ steps, phase, currentStep }: StepTrackerProps) {
     currentStep &&
     currentStep !== lastStepDescription,
   );
+
+  const lastStepId = steps[steps.length - 1]?.id;
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [steps.length, lastStepId, currentStep, phase, showCurrentStep]);
 
   if (steps.length === 0 && !isActive) return null;
 
@@ -62,6 +70,8 @@ export function StepTracker({ steps, phase, currentStep }: StepTrackerProps) {
           </span>
         </div>
       )}
+
+      <div ref={bottomRef} className="h-0 w-full shrink-0" aria-hidden />
     </div>
   );
 }
