@@ -1,6 +1,7 @@
 """Tests for performance optimizations: speculative browser + direct extraction."""
 
 import asyncio
+import math
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -194,6 +195,136 @@ async def test_create_browser_silent_returns_timing():
     assert cdp_url == "ws://test:1234"
     assert creation_ms >= 0
     assert browser.browser_id == "test-123"
+
+
+# ──────────────────────────────────────────────────────────────
+# Vectorized REST cosine-similarity search tests
+# ──────────────────────────────────────────────────────────────
+
+
+def _ref_cosine(a: list[float], b: list[float]) -> float:
+    """Plain-Python cosine similarity reference for cross-checking numpy."""
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(x * x for x in b))
+    return dot / (na * nb)
+
+
+def _patch_supabase(rows: list[dict]):
+    """Patch supabase.create_client so _search_via_rest sees `rows` as .data."""
+    query = MagicMock()
+    query.select.return_value = query
+    query.gte.return_value = query
+    query.execute.return_value = MagicMock(data=rows)
+
+    client = MagicMock()
+    client.table.return_value = query
+
+    return patch("supabase.create_client", return_value=client)
+
+
+@pytest.mark.asyncio
+async def test_rest_similarity_matches_reference_and_orders():
+    """Vectorized matmul must equal the hand-computed cosine, with boosts + sort."""
+    from src.matching.matcher import _search_via_rest
+
+    query_emb = [1.0, 0.0, 0.0, 0.0]
+    # Query domain matches none of the candidate domains, so all rows survive
+    # the domain filter and none receive the domain boost. That isolates the
+    # action-type boost so we can verify it independently of cosine math.
+    rows = [
+        # cosine ~0.707, action matches query → +0.05 boost.
+        {"id": "boosted", "task_pattern": "p", "steps": "[]", "handoff_index": 0,
+         "parameters": "[]", "confidence": 0.9, "action_type": "purchase",
+         "domain": "shop.net", "embedding": [1.0, 1.0, 0.0, 0.0]},
+        # cosine ~0.707, action differs → no boost.
+        {"id": "plain", "task_pattern": "p", "steps": "[]", "handoff_index": 0,
+         "parameters": "[]", "confidence": 0.9, "action_type": "search",
+         "domain": "shop.net", "embedding": [1.0, 1.0, 0.0, 0.0]},
+        # orthogonal → cosine ~0.0, no boost.
+        {"id": "far", "task_pattern": "p", "steps": "[]", "handoff_index": 0,
+         "parameters": "[]", "confidence": 0.9, "action_type": "search",
+         "domain": "shop.net", "embedding": [0.0, 1.0, 0.0, 0.0]},
+    ]
+
+    with _patch_supabase(rows), patch.dict(
+        "os.environ",
+        {"SUPABASE_URL": "x", "SUPABASE_SERVICE_ROLE_KEY": "x"},
+    ):
+        result = await _search_via_rest(query_emb, "example.com", "purchase")
+
+    # Sorted descending: boosted (~0.757) > plain (~0.707) > far (~0.0).
+    assert [r["id"] for r in result] == ["boosted", "plain", "far"]
+
+    by_id = {r["id"]: r for r in result}
+    cos = _ref_cosine(query_emb, [1.0, 1.0, 0.0, 0.0])
+    # plain: vectorized cosine equals the plain-Python reference, no boost.
+    assert math.isclose(by_id["plain"]["similarity"], cos, rel_tol=1e-9, abs_tol=1e-9)
+    # boosted: same cosine plus the +0.05 action-type boost.
+    assert math.isclose(by_id["boosted"]["similarity"], cos + 0.05, rel_tol=1e-9, abs_tol=1e-9)
+    # far: orthogonal → ~0.0, no boost.
+    assert math.isclose(by_id["far"]["similarity"], 0.0, abs_tol=1e-9)
+
+
+@pytest.mark.asyncio
+async def test_rest_caps_similarity_at_one():
+    """Domain + action boosts on an already-high cosine clamp to 1.0."""
+    from src.matching.matcher import _search_via_rest
+
+    rows = [
+        {"id": "exact", "task_pattern": "p", "steps": "[]", "handoff_index": 0,
+         "parameters": "[]", "confidence": 0.9, "action_type": "purchase",
+         "domain": "amazon.com", "embedding": [1.0, 0.0, 0.0, 0.0]},
+    ]
+
+    with _patch_supabase(rows), patch.dict(
+        "os.environ",
+        {"SUPABASE_URL": "x", "SUPABASE_SERVICE_ROLE_KEY": "x"},
+    ):
+        result = await _search_via_rest([1.0, 0.0, 0.0, 0.0], "amazon.com", "purchase")
+
+    # cosine 1.0 + 0.05 domain + 0.05 action = 1.10, capped at 1.0.
+    assert result[0]["similarity"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_rest_skips_missing_and_zero_embeddings():
+    """Rows with no embedding or a zero vector are dropped, not crashed on."""
+    from src.matching.matcher import _search_via_rest
+
+    rows = [
+        {"id": "noemb", "task_pattern": "p", "steps": "[]", "handoff_index": 0,
+         "parameters": "[]", "confidence": 0.9, "action_type": "search",
+         "domain": "amazon.com", "embedding": None},
+        {"id": "zero", "task_pattern": "p", "steps": "[]", "handoff_index": 0,
+         "parameters": "[]", "confidence": 0.9, "action_type": "search",
+         "domain": "amazon.com", "embedding": [0.0, 0.0, 0.0, 0.0]},
+        {"id": "good", "task_pattern": "p", "steps": "[]", "handoff_index": 0,
+         "parameters": "[]", "confidence": 0.9, "action_type": "search",
+         "domain": "amazon.com", "embedding": [1.0, 0.0, 0.0, 0.0]},
+    ]
+
+    with _patch_supabase(rows), patch.dict(
+        "os.environ",
+        {"SUPABASE_URL": "x", "SUPABASE_SERVICE_ROLE_KEY": "x"},
+    ):
+        result = await _search_via_rest([1.0, 0.0, 0.0, 0.0], "amazon.com", None)
+
+    assert [r["id"] for r in result] == ["good"]
+
+
+@pytest.mark.asyncio
+async def test_rest_empty_candidates_returns_empty():
+    """No rows at all → empty list, no exception."""
+    from src.matching.matcher import _search_via_rest
+
+    with _patch_supabase([]), patch.dict(
+        "os.environ",
+        {"SUPABASE_URL": "x", "SUPABASE_SERVICE_ROLE_KEY": "x"},
+    ):
+        result = await _search_via_rest([1.0, 0.0, 0.0, 0.0], "amazon.com", None)
+
+    assert result == []
 
 
 @pytest.mark.asyncio

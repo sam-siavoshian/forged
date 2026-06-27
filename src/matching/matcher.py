@@ -147,34 +147,52 @@ async def _search_via_rest(
     ]
     candidates = domain_filtered if domain_filtered else result.data
 
-    # Compute cosine similarity in Python
-    query_vec = np.array(embedding)
+    # Compute cosine similarity, vectorized. Stack every candidate embedding
+    # into one matrix and do a single matmul instead of a per-template Python
+    # loop. This is the hot path on networks that block direct pgvector
+    # (e.g. campus WiFi), where every match falls back to REST.
+    query_vec = np.asarray(embedding, dtype=np.float64)
     query_norm = np.linalg.norm(query_vec)
     if query_norm == 0:
         return []
 
-    scored = []
+    # Collect candidates that actually carry an embedding, preserving order.
+    valid: list[dict[str, Any]] = []
+    vectors: list[list[float]] = []
     for t in candidates:
         t_emb = t.get("embedding")
         if not t_emb:
             continue
         if isinstance(t_emb, str):
             t_emb = json.loads(t_emb)
-        t_vec = np.array(t_emb)
-        t_norm = np.linalg.norm(t_vec)
+        valid.append(t)
+        vectors.append(t_emb)
+
+    if not valid:
+        return []
+
+    matrix = np.asarray(vectors, dtype=np.float64)  # (N, dims)
+    norms = np.linalg.norm(matrix, axis=1)  # (N,)
+    # Zero-norm rows would divide-by-zero; we skip them below, so suppress the
+    # warning and let the resulting nan/inf be filtered out.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        sims = (matrix @ query_vec) / (norms * query_norm)  # (N,)
+
+    scored = []
+    for t, sim, t_norm in zip(valid, sims, norms):
         if t_norm == 0:
             continue
-        sim = float(np.dot(query_vec, t_vec) / (query_norm * t_norm))
+        s = float(sim)
 
         # Boost similarity when domain and action type match.
         # This prevents near-misses from falling below threshold
         # when the task structure is clearly the same.
         if _domain_matches(t.get("domain", ""), domain):
-            sim += 0.05
+            s += 0.05
         if action_type and t.get("action_type") == action_type:
-            sim += 0.05
+            s += 0.05
 
-        t["similarity"] = min(sim, 1.0)  # cap at 1.0
+        t["similarity"] = min(s, 1.0)  # cap at 1.0
         scored.append(t)
 
     scored.sort(key=lambda x: x["similarity"], reverse=True)
